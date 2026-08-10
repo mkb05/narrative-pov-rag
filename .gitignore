@@ -1,0 +1,60 @@
+# ==========================================
+# ENVIRONMENT VARIABLES & SECRETS
+# ==========================================
+.env
+.env.local
+.env.*.local
+
+# ==========================================
+# PYTHON & VIRTUAL ENVIRONMENTS
+# ==========================================
+venv/
+ENV/
+env/
+ENV3/
+*.pyc
+*.pyo
+*.pyd
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ==========================================
+# LOCAL DATABASES & CACHES
+# ==========================================
+backend/database/chroma_store/
+*.db
+*.sqlite
+*.sqlite3
+
+# ==========================================
+# NODE.JS & FRONTEND (Next.js / React)
+# ==========================================
+node_modules/
+.next/
+out/
+build/
+dist/
+.npm
+.pnpm-debug.log*
+.yarn-debug.log*
+.yarn-test.log*
+
+# ==========================================
+# HUGGING FACE & LOCAL MODEL CACHES
+# ==========================================
+.cache/
+huggingface/
+hub/
+
+# ==========================================
+# OPERATING SYSTEM / IDE ARTIFACTS
+# ==========================================
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
