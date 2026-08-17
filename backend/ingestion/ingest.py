@@ -45,7 +45,7 @@ def load_epub_book(file_path: str):
 
 def extract_chunk_metadata(chunk_text: str, book_title: str, chunk_index: int):
     """
-    Uses llama-3.1-8b-instant to extract active characters and assign a section ID.
+    Uses groq/compound-mini to extract active characters and assign a section ID.
     """
     prompt = f"""
     Analyze the following book excerpt from '{book_title}' (Chunk {chunk_index}).
@@ -60,7 +60,7 @@ def extract_chunk_metadata(chunk_text: str, book_title: str, chunk_index: int):
 
     try:
         response = groq_client.chat.completions.create(
-            model="llama-3.1-8b-instant",
+            model="groq/compound-mini",  # Updated to active free tier model
             messages=[{"role": "user", "content": prompt}],
             response_format={"type": "json_object"}
         )
@@ -88,13 +88,14 @@ def push_chunks_to_pinecone(chunks):
         
         # Pinecone metadata values must be strings, numbers, or lists of strings
         payload = {
-            "page_content": chunk.page_content,
-            "book_id": str(chunk.metadata.get("book_id")),
-            "section_id": int(chunk.metadata.get("section_id", 0)),
-            "active_characters": list(chunk.metadata.get("active_characters", [])),
-            "chunk_summary": str(chunk.metadata.get("chunk_summary", "")),
-            "source": str(chunk.metadata.get("source", ""))
-        }
+                "text": chunk.page_content, 
+                "page_content": chunk.page_content,
+                "book_id": str(chunk.metadata.get("book_id")),
+                "section_id": int(chunk.metadata.get("section_id", 0)),
+                "active_characters": list(chunk.metadata.get("active_characters", [])),
+                "chunk_summary": str(chunk.metadata.get("chunk_summary", "")),
+                "source": str(chunk.metadata.get("source", ""))
+            }
         
         vector_id = f"chunk_{start_id + idx}"
         vectors_to_upsert.append({

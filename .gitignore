@@ -27,7 +27,7 @@ backend/database/chroma_store/
 *.db
 *.sqlite
 *.sqlite3
-
+data/
 # ==========================================
 # NODE.JS & FRONTEND (Next.js / React)
 # ==========================================
