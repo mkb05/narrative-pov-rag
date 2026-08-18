@@ -13,25 +13,53 @@ from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from upstash_redis import Redis
 
+# Ensure ingestion modules can be imported under any execution context
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'ingestion')))
-from backend.ingestion.ingest import extract_chunk_metadata
+
+try:
+    from backend.ingestion.ingest import extract_chunk_metadata
+except ImportError:
+    try:
+        from ingestion.ingest import extract_chunk_metadata
+    except ImportError:
+        from ingest import extract_chunk_metadata
 
 load_dotenv()
 
-# Initialize Clients
+# Initialize Lightweight Clients
 groq_client = Groq(api_key=os.getenv("GROQ_API_KEY_GENERATION"))
-embeddings_model = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
 
-# Initialize Pinecone
+# Initialize Pinecone Client (Connection only - 0 memory overhead)
 pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
 pinecone_index_name = os.getenv("PINECONE_INDEX_NAME", "literary-pov-master")
 pinecone_index = pc.Index(pinecone_index_name)
 
-vector_store = PineconeVectorStore(
-    index_name=pinecone_index_name,
-    embedding=embeddings_model,
-    text_key="text"
-)
+# ==========================================
+# LAZY LOADING SINGLETONS (Prevents OOM)
+# ==========================================
+_embeddings_model = None
+_vector_store = None
+
+def get_embeddings_model():
+    """Lazily loads HuggingFace embedding weights only when first requested."""
+    global _embeddings_model
+    if _embeddings_model is None:
+        print("[RAG Engine] Lazily loading HuggingFaceEmbeddings (all-MiniLM-L6-v2)...")
+        _embeddings_model = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+    return _embeddings_model
+
+def get_vector_store():
+    """Lazily initializes PineconeVectorStore wrapper when first requested."""
+    global _vector_store
+    if _vector_store is None:
+        _vector_store = PineconeVectorStore(
+            index_name=pinecone_index_name,
+            embedding=get_embeddings_model(),
+            text_key="text"
+        )
+    return _vector_store
+
 
 # Initialize Upstash Redis
 try:
@@ -48,16 +76,32 @@ except Exception as e:
     REDIS_AVAILABLE = False
 
 
-
-
 def clean_think_tags(text: str) -> str:
-    """Removes chain-of-thought <think>...</think> blocks from reasoning models."""
+    """Removes chain-of-thought blocks and meta-planning headers from reasoning models."""
     if not text:
         return ""
-    # Strip complete <think>...</think> blocks
+    # Strip explicit <think>...</think> tags
     cleaned = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
-    # Strip unclosed <think> tags if generation stopped mid-thought
     cleaned = re.sub(r'<think>.*', '', cleaned, flags=re.DOTALL)
+
+    # Strip standard planning/outline traces if present
+    if "Here's a thinking process:" in cleaned or "Thinking Process:" in cleaned:
+        parts = re.split(
+            r'\*\(Start directly in character\)\*|\(Start directly in character\)|\(Opening\)|5\.\s+\*\*Draft|\*\*Drafting\*\*:', 
+            cleaned, 
+            flags=re.IGNORECASE
+        )
+        if len(parts) > 1:
+            cleaned = parts[-1]
+        else:
+            paragraphs = cleaned.split("\n\n")
+            narrative_paras = [
+                p for p in paragraphs 
+                if not any(p.strip().startswith(prefix) for prefix in ["-", "*", "1.", "2.", "3.", "4.", "5.", "Here's", "Thinking"])
+            ]
+            if narrative_paras:
+                cleaned = "\n\n".join(narrative_paras)
+
     return cleaned.strip()
 
 
@@ -100,6 +144,9 @@ def check_and_lazy_ingest_book(book_id: str):
     vectors_to_upsert = []
     total_vectors = pinecone_index.describe_index_stats().get("total_vector_count", 0)
 
+    # Use lazy loaded embeddings
+    embeddings = get_embeddings_model()
+
     for idx, chunk in enumerate(docs[:15] if len(docs) > 15 else docs):
         meta = extract_chunk_metadata(chunk.page_content, book_id, idx)
         payload = {
@@ -111,7 +158,7 @@ def check_and_lazy_ingest_book(book_id: str):
             "chunk_summary": str(meta.get("summary", "")),
             "source": f"gutenberg_{g_id}"
         }
-        vector = embeddings_model.embed_query(chunk.page_content)
+        vector = embeddings.embed_query(chunk.page_content)
         vectors_to_upsert.append({
             "id": f"chunk_{total_vectors + idx}",
             "values": vector,
@@ -136,7 +183,7 @@ def query_narrative_graph(book_id: str, section_id: int, query: str) -> str:
     historical_summary = get_cumulative_summary(book_id, section_id)
 
     system_persona = (
-     "You are an insightful literary companion. Explain character dynamics, shifting relationships, "
+        "You are an insightful literary companion. Explain character dynamics, shifting relationships, "
         "and multi-hop connections in clear, engaging, conversational language. "
         "DO NOT output raw markdown tables, database syntax, planning outlines, or <think> tags. "
         "Use concise paragraphs, standalone bold labels, and bullet points."
@@ -152,8 +199,11 @@ Current Section Canonical Context:
 
 User Graph Query: {query}
 
-Task:
-Trace the character connections, relationship changes, and thematic developments up to Section {section_id} to answer the query directly:
+Instructions:
+1. Answer the question directly in 2-3 clear sentences.
+2. Highlight key relationship shifts using lightweight bullet points (e.g., 'Character A → Character B: Shift').
+3. Note any ripple effects across the social circle.
+4. Keep the tone conversational and accessible.
 """
 
     try:
@@ -163,12 +213,13 @@ Trace the character connections, relationship changes, and thematic developments
                 {"role": "system", "content": system_persona},
                 {"role": "user", "content": user_prompt}
             ],
-            temperature=0.5,
-            max_tokens=600
+            temperature=0.4,
+            max_tokens=700
         )
         return clean_think_tags(response.choices[0].message.content)
     except Exception as e:
         return f"Graph query failed: {e}"
+
 
 # ==========================================
 # CACHED SECTION TEXT & DYNAMIC CHARACTERS
@@ -185,13 +236,15 @@ def get_original_section_text(book_id: str, section_id: int) -> str:
 
     check_and_lazy_ingest_book(book_id)
     
-    retriever = vector_store.as_retriever(
+    # Lazy vector store
+    v_store = get_vector_store()
+    retriever = v_store.as_retriever(
         search_kwargs={"filter": {"book_id": book_id, "section_id": section_id}, "k": 5}
     )
     docs = retriever.invoke(f"What happens in section {section_id}?")
     
     if not docs:
-        retriever_fallback = vector_store.as_retriever(
+        retriever_fallback = v_store.as_retriever(
             search_kwargs={"filter": {"book_id": book_id}, "k": 5}
         )
         docs = retriever_fallback.invoke(f"Section {section_id}")
@@ -255,6 +308,7 @@ def get_section_characters(book_id: str, section_id: int) -> list[str]:
 # ==========================================
 
 def get_cumulative_summary(book_id: str, section_id: int) -> str:
+    """Fetches accumulated rolling summary from Redis."""
     if section_id <= 1:
         return "This is the beginning of the narrative."
     
@@ -266,6 +320,7 @@ def get_cumulative_summary(book_id: str, section_id: int) -> str:
 
 
 def save_cumulative_summary(book_id: str, section_id: int, summary_text: str):
+    """Stores rolling summary in Redis for subsequent sections."""
     cache_key = f"summary:{book_id}:section_{section_id}"
     if REDIS_AVAILABLE:
         redis_client.set(cache_key, summary_text)
@@ -326,7 +381,7 @@ Recount and explain this scene as {target_character}. Tell me what happened, how
 Begin speaking directly in character now:
 """
 
-    print(f"[Groq LLM Generation] Synthesizing {target_character} POV for Section {section_id}...")
+    print(f"[Groq LLM Generation] Synthesizing {target_character} POV for Section {section_id} via openai/gpt-oss-120b...")
     try:
         response = groq_client.chat.completions.create(
             model="openai/gpt-oss-120b",
@@ -335,14 +390,13 @@ Begin speaking directly in character now:
                 {"role": "user", "content": user_prompt}
             ],
             temperature=0.7,
-            max_tokens=1200
+            max_tokens=1000
         )
         raw_output = response.choices[0].message.content
         generated_output = clean_think_tags(raw_output)
 
-        # Fallback if model returned only think tags
         if not generated_output:
-            generated_output = raw_output.replace("<think>", "").replace("</think>", "").strip()
+            generated_output = raw_output.strip()
 
         # Cache generated POV in Redis
         if REDIS_AVAILABLE and generated_output:
