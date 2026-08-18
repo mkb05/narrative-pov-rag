@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import ReactMarkdown from "react-markdown";
 
 const MOCK_BOOKS = [
   {
@@ -485,8 +486,11 @@ export default function NewspaperHome() {
                             : "Search Graph"}
                         </button>
                         {searchResult && (
-                          <div className="text-[11px] mt-2 italic text-indigo-950 bg-indigo-50 p-2 border border-indigo-200 leading-relaxed max-h-48 overflow-y-auto whitespace-pre-wrap">
-                            {searchResult}
+                          <div className="text-[12px] mt-3 text-indigo-950 bg-indigo-50/80 p-3 border border-indigo-200 leading-relaxed max-h-60 overflow-y-auto font-serif">
+                            {/* Move the typography classes to a wrapper div */}
+                            <div className="prose prose-sm prose-indigo max-w-none">
+                              <ReactMarkdown>{searchResult}</ReactMarkdown>
+                            </div>
                           </div>
                         )}
                       </div>
