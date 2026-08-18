@@ -13,24 +13,18 @@ from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from upstash_redis import Redis
 
-# Ensure ingestion modules can be imported under any execution context
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'ingestion')))
-
 try:
     from backend.ingestion.ingest import extract_chunk_metadata
 except ImportError:
-    try:
-        from ingestion.ingest import extract_chunk_metadata
-    except ImportError:
-        from ingest import extract_chunk_metadata
+    from backend.ingestion.ingest import extract_chunk_metadata
 
 load_dotenv()
 
-# Initialize Lightweight Clients
+# Initialize Lightweight Clients (Zero Memory Overhead on Startup)
 groq_client = Groq(api_key=os.getenv("GROQ_API_KEY_GENERATION"))
 
-# Initialize Pinecone Client (Connection only - 0 memory overhead)
+# Initialize Pinecone Client Connection
 pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
 pinecone_index_name = os.getenv("PINECONE_INDEX_NAME", "literary-pov-master")
 pinecone_index = pc.Index(pinecone_index_name)
@@ -60,7 +54,6 @@ def get_vector_store():
         )
     return _vector_store
 
-
 # Initialize Upstash Redis
 try:
     redis_client = Redis(
@@ -80,11 +73,9 @@ def clean_think_tags(text: str) -> str:
     """Removes chain-of-thought blocks and meta-planning headers from reasoning models."""
     if not text:
         return ""
-    # Strip explicit <think>...</think> tags
     cleaned = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
     cleaned = re.sub(r'<think>.*', '', cleaned, flags=re.DOTALL)
-
-    # Strip standard planning/outline traces if present
+    
     if "Here's a thinking process:" in cleaned or "Thinking Process:" in cleaned:
         parts = re.split(
             r'\*\(Start directly in character\)\*|\(Start directly in character\)|\(Opening\)|5\.\s+\*\*Draft|\*\*Drafting\*\*:', 
@@ -143,8 +134,6 @@ def check_and_lazy_ingest_book(book_id: str):
     
     vectors_to_upsert = []
     total_vectors = pinecone_index.describe_index_stats().get("total_vector_count", 0)
-
-    # Use lazy loaded embeddings
     embeddings = get_embeddings_model()
 
     for idx, chunk in enumerate(docs[:15] if len(docs) > 15 else docs):
@@ -177,7 +166,6 @@ def query_narrative_graph(book_id: str, section_id: int, query: str) -> str:
     if not query.strip():
         return "Please enter a specific question about character relationships or events."
 
-    # Fetch context for the scene and prior summary
     scene_text = get_original_section_text(book_id, section_id)
     chars = get_section_characters(book_id, section_id)
     historical_summary = get_cumulative_summary(book_id, section_id)
@@ -236,7 +224,6 @@ def get_original_section_text(book_id: str, section_id: int) -> str:
 
     check_and_lazy_ingest_book(book_id)
     
-    # Lazy vector store
     v_store = get_vector_store()
     retriever = v_store.as_retriever(
         search_kwargs={"filter": {"book_id": book_id, "section_id": section_id}, "k": 5}
@@ -308,7 +295,6 @@ def get_section_characters(book_id: str, section_id: int) -> list[str]:
 # ==========================================
 
 def get_cumulative_summary(book_id: str, section_id: int) -> str:
-    """Fetches accumulated rolling summary from Redis."""
     if section_id <= 1:
         return "This is the beginning of the narrative."
     
@@ -320,7 +306,6 @@ def get_cumulative_summary(book_id: str, section_id: int) -> str:
 
 
 def save_cumulative_summary(book_id: str, section_id: int, summary_text: str):
-    """Stores rolling summary in Redis for subsequent sections."""
     cache_key = f"summary:{book_id}:section_{section_id}"
     if REDIS_AVAILABLE:
         redis_client.set(cache_key, summary_text)
@@ -333,7 +318,6 @@ def retrieve_and_generate_pov(book_id: str, section_id: int, target_character: s
     """
     pov_cache_key = f"pov:{book_id}:section_{section_id}:{target_character.replace(' ', '_').lower()}"
     
-    # 1. Zero-Token Check for Previously Generated POVs
     if REDIS_AVAILABLE:
         cached_pov = redis_client.get(pov_cache_key)
         if cached_pov:
@@ -343,11 +327,9 @@ def retrieve_and_generate_pov(book_id: str, section_id: int, target_character: s
                 "cached": True
             }
 
-    # 2. Get Raw Text & Historical Rolling Context
     target_scene_text = get_original_section_text(book_id, section_id)
     historical_summary = get_cumulative_summary(book_id, section_id)
 
-    # 3. Construct Strict Persona Prompts
     if target_character.lower() in ["author intent", "original author intent"]:
         system_persona = (
             "You are the author reflecting on your work. Explain your narrative choices, "
@@ -398,11 +380,9 @@ Begin speaking directly in character now:
         if not generated_output:
             generated_output = raw_output.strip()
 
-        # Cache generated POV in Redis
         if REDIS_AVAILABLE and generated_output:
             redis_client.set(pov_cache_key, generated_output)
 
-        # Update progressive cumulative summary for next sections
         new_summary = f"{historical_summary} -> Section {section_id} events: {target_scene_text[:300]}..."
         save_cumulative_summary(book_id, section_id, new_summary)
 
