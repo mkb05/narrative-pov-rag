@@ -14,17 +14,14 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from upstash_redis import Redis
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'ingestion')))
-try:
-    from backend.ingestion.ingest import extract_chunk_metadata
-except ImportError:
-    from backend.ingestion.ingest import extract_chunk_metadata
+from ingest import extract_chunk_metadata
 
 load_dotenv()
 
-# Initialize Lightweight Clients (Zero Memory Overhead on Startup)
+# Initialize Lightweight Clients
 groq_client = Groq(api_key=os.getenv("GROQ_API_KEY_GENERATION"))
 
-# Initialize Pinecone Client Connection
+# Initialize Pinecone Connection Only (0 memory overhead on startup)
 pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
 pinecone_index_name = os.getenv("PINECONE_INDEX_NAME", "literary-pov-master")
 pinecone_index = pc.Index(pinecone_index_name)
@@ -70,30 +67,8 @@ except Exception as e:
 
 
 def clean_think_tags(text: str) -> str:
-    """Removes chain-of-thought blocks and meta-planning headers from reasoning models."""
-    if not text:
-        return ""
-    cleaned = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
-    cleaned = re.sub(r'<think>.*', '', cleaned, flags=re.DOTALL)
-    
-    if "Here's a thinking process:" in cleaned or "Thinking Process:" in cleaned:
-        parts = re.split(
-            r'\*\(Start directly in character\)\*|\(Start directly in character\)|\(Opening\)|5\.\s+\*\*Draft|\*\*Drafting\*\*:', 
-            cleaned, 
-            flags=re.IGNORECASE
-        )
-        if len(parts) > 1:
-            cleaned = parts[-1]
-        else:
-            paragraphs = cleaned.split("\n\n")
-            narrative_paras = [
-                p for p in paragraphs 
-                if not any(p.strip().startswith(prefix) for prefix in ["-", "*", "1.", "2.", "3.", "4.", "5.", "Here's", "Thinking"])
-            ]
-            if narrative_paras:
-                cleaned = "\n\n".join(narrative_paras)
-
-    return cleaned.strip()
+    """Removes chain-of-thought <think> tags from reasoning models."""
+    return re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL).strip()
 
 
 def check_and_lazy_ingest_book(book_id: str):
@@ -157,56 +132,6 @@ def check_and_lazy_ingest_book(book_id: str):
         
     pinecone_index.upsert(vectors=vectors_to_upsert)
     return True
-
-
-def query_narrative_graph(book_id: str, section_id: int, query: str) -> str:
-    """
-    Executes relational and thematic graph search for a specific book and section.
-    """
-    if not query.strip():
-        return "Please enter a specific question about character relationships or events."
-
-    scene_text = get_original_section_text(book_id, section_id)
-    chars = get_section_characters(book_id, section_id)
-    historical_summary = get_cumulative_summary(book_id, section_id)
-
-    system_persona = (
-        "You are an insightful literary companion. Explain character dynamics, shifting relationships, "
-        "and multi-hop connections in clear, engaging, conversational language. "
-        "DO NOT output raw markdown tables, database syntax, planning outlines, or <think> tags. "
-        "Use concise paragraphs, standalone bold labels, and bullet points."
-    )
-
-    user_prompt = f"""
-Book: {book_id}
-Timeline Point: Section {section_id}
-Active Characters in Graph: {', '.join(chars) if chars else 'Primary Cast'}
-Narrative History: {historical_summary}
-Current Section Canonical Context:
-{scene_text[:2000]}
-
-User Graph Query: {query}
-
-Instructions:
-1. Answer the question directly in 2-3 clear sentences.
-2. Highlight key relationship shifts using lightweight bullet points (e.g., 'Character A → Character B: Shift').
-3. Note any ripple effects across the social circle.
-4. Keep the tone conversational and accessible.
-"""
-
-    try:
-        response = groq_client.chat.completions.create(
-            model="openai/gpt-oss-120b",
-            messages=[
-                {"role": "system", "content": system_persona},
-                {"role": "user", "content": user_prompt}
-            ],
-            temperature=0.4,
-            max_tokens=700
-        )
-        return clean_think_tags(response.choices[0].message.content)
-    except Exception as e:
-        return f"Graph query failed: {e}"
 
 
 # ==========================================
@@ -330,38 +255,37 @@ def retrieve_and_generate_pov(book_id: str, section_id: int, target_character: s
     target_scene_text = get_original_section_text(book_id, section_id)
     historical_summary = get_cumulative_summary(book_id, section_id)
 
-    if target_character.lower() in ["author intent", "original author intent"]:
+    if target_character.lower() == "author intent":
         system_persona = (
-            "You are the author reflecting on your work. Explain your narrative choices, "
-            "thematic goals, and character dynamics in this section in an engaging, conversational literary voice. "
-            "Do NOT include planning notes, lists of constraints, or chain-of-thought tags."
+            "You are an objective literary scholar. Explain the underlying themes, "
+            "foreshadowing, narrative tension, and structural intent behind the provided scene."
         )
-        user_prompt = f"""
-Book: {book_id} (Section {section_id})
-Prior Plot Context: {historical_summary}
-Canonical Text of This Scene:
-{target_scene_text}
-
-Task:
-Explain what is happening in this scene, why you wrote it this way, and the underlying tension between the characters. 
-Begin your response immediately:
-"""
+        task_instruction = (
+            f"Analyze the scene below from '{book_id}' (Section {section_id}). "
+            "Do NOT provide meta-notes or chain-of-thought blocks. Output only the thematic critique."
+        )
     else:
         system_persona = (
-            f"You are {target_character} from '{book_id}'. You are recounting and explaining the events of this scene "
-            f"directly to the reader in your own distinct voice and personality. Use first-person ('I', 'me', 'my'). "
-            f"Focus on your emotions, motives, reactions, and internal monologue during these events. "
-            f"Do NOT break character. Do NOT explain what you are doing. Do NOT output analysis or <think> tags."
+            f"You are {target_character}. You exist entirely inside the world of this book. "
+            "Speak directly in the first person ('I', 'me', 'my'). Express your raw emotions, "
+            "internal motivations, and immediate reactions to this exact scene."
         )
-        user_prompt = f"""
-Prior Background: {historical_summary}
-The Events Happening in This Scene:
-{target_scene_text}
+        task_instruction = (
+            f"Retell and experience this scene directly as {target_character}. "
+            "Do NOT introduce yourself, do NOT analyze the text as a reader, and do NOT include think tags. "
+            "Begin directly in character:"
+        )
 
-Task:
-Recount and explain this scene as {target_character}. Tell me what happened, how you felt about it, and what you were thinking at that moment.
-Begin speaking directly in character now:
-"""
+    prompt = f"""
+    [Historical Context / Previous Summary]:
+    {historical_summary}
+
+    [Target Scene Text (Section {section_id})]:
+    {target_scene_text}
+
+    [Task Instructions]:
+    {task_instruction}
+    """
 
     print(f"[Groq LLM Generation] Synthesizing {target_character} POV for Section {section_id} via openai/gpt-oss-120b...")
     try:
@@ -369,18 +293,14 @@ Begin speaking directly in character now:
             model="openai/gpt-oss-120b",
             messages=[
                 {"role": "system", "content": system_persona},
-                {"role": "user", "content": user_prompt}
+                {"role": "user", "content": prompt}
             ],
             temperature=0.7,
             max_tokens=1000
         )
-        raw_output = response.choices[0].message.content
-        generated_output = clean_think_tags(raw_output)
+        generated_output = clean_think_tags(response.choices[0].message.content)
 
-        if not generated_output:
-            generated_output = raw_output.strip()
-
-        if REDIS_AVAILABLE and generated_output:
+        if REDIS_AVAILABLE:
             redis_client.set(pov_cache_key, generated_output)
 
         new_summary = f"{historical_summary} -> Section {section_id} events: {target_scene_text[:300]}..."
@@ -393,3 +313,48 @@ Begin speaking directly in character now:
 
     except Exception as e:
         return {"pov_content": f"Generation failed due to Groq API error: {e}", "cached": False}
+
+
+def query_narrative_graph(book_id: str, section_id: int, query: str) -> str:
+    """
+    Executes graph relationship search and formats output into 
+    clear, easy-to-read narrative insights using available free Groq model.
+    """
+    if not query.strip():
+        return "Please enter a specific question about character relationships or events."
+
+    scene_text = get_original_section_text(book_id, section_id)
+    chars = get_section_characters(book_id, section_id)
+    historical_summary = get_cumulative_summary(book_id, section_id)
+
+    system_persona = (
+        "You are an insightful literary companion. Explain character dynamics, shifting relationships, "
+        "and multi-hop connections in clear, engaging, conversational language. "
+        "DO NOT output raw markdown tables, database syntax, planning outlines, or <think> tags. "
+        "Use concise paragraphs, standalone bold labels, and bullet points."
+    )
+
+    user_prompt = f"""
+Book: {book_id}
+Timeline Point: Section {section_id}
+Active Characters in Graph: {', '.join(chars) if chars else 'Primary Cast'}
+Narrative History: {historical_summary}
+Current Section Canonical Context:
+{scene_text[:2000]}
+
+User Graph Query: {query}
+"""
+
+    try:
+        response = groq_client.chat.completions.create(
+            model="openai/gpt-oss-120b",
+            messages=[
+                {"role": "system", "content": system_persona},
+                {"role": "user", "content": user_prompt}
+            ],
+            temperature=0.5,
+            max_tokens=600
+        )
+        return clean_think_tags(response.choices[0].message.content)
+    except Exception as e:
+        return f"Graph query failed: {e}"
