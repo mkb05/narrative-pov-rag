@@ -2,54 +2,20 @@ import os
 import sys
 import json
 import re
-import time
-import requests
 from dotenv import load_dotenv
 from groq import Groq
 from pinecone import Pinecone
-from langchain_pinecone import PineconeVectorStore
-from langchain_huggingface import HuggingFaceEmbeddings
-from langchain_core.documents import Document
-from langchain_text_splitters import RecursiveCharacterTextSplitter
 from upstash_redis import Redis
-
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'ingestion')))
-from ingest import extract_chunk_metadata
 
 load_dotenv()
 
 # Initialize Lightweight Clients
 groq_client = Groq(api_key=os.getenv("GROQ_API_KEY_GENERATION"))
 
-# Initialize Pinecone Connection Only (0 memory overhead on startup)
+# Initialize Pinecone Connection (0 memory overhead)
 pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
 pinecone_index_name = os.getenv("PINECONE_INDEX_NAME", "literary-pov-master")
 pinecone_index = pc.Index(pinecone_index_name)
-
-# ==========================================
-# LAZY LOADING SINGLETONS (Prevents OOM)
-# ==========================================
-_embeddings_model = None
-_vector_store = None
-
-def get_embeddings_model():
-    """Lazily loads HuggingFace embedding weights only when first requested."""
-    global _embeddings_model
-    if _embeddings_model is None:
-        print("[RAG Engine] Lazily loading HuggingFaceEmbeddings (all-MiniLM-L6-v2)...")
-        _embeddings_model = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
-    return _embeddings_model
-
-def get_vector_store():
-    """Lazily initializes PineconeVectorStore wrapper when first requested."""
-    global _vector_store
-    if _vector_store is None:
-        _vector_store = PineconeVectorStore(
-            index_name=pinecone_index_name,
-            embedding=get_embeddings_model(),
-            text_key="text"
-        )
-    return _vector_store
 
 # Initialize Upstash Redis
 try:
@@ -61,77 +27,18 @@ try:
     REDIS_AVAILABLE = True
     print("[RAG Engine] Upstash Redis Connected & Active!")
 except Exception as e:
-    print(f"[RAG Engine] Redis connection failed ({e}). Falling back to memory dictionary.")
+    print(f"[RAG Engine] Redis connection failed ({e}).")
     redis_client = {}
     REDIS_AVAILABLE = False
 
 
 def clean_think_tags(text: str) -> str:
-    """Removes chain-of-thought <think> tags from reasoning models."""
-    return re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL).strip()
-
-
-def check_and_lazy_ingest_book(book_id: str):
-    """Ensures book chunks are embedded in Pinecone on demand."""
-    results = pinecone_index.query(
-        vector=[0.0] * 384,
-        filter={"book_id": {"$eq": book_id}},
-        top_k=1,
-        include_metadata=False
-    )
-    
-    if results.get("matches"):
-        return True
-
-    print(f"[Lazy Ingestion] Book '{book_id}' missing in vector DB. Fetching from Gutenberg...")
-
-    gutenberg_map = {
-        "frankenstein": 84,
-        "pride_and_prejudice": 1342,
-        "dracula": 345,
-        "the_adventures_of_sherlock_holmes": 1661
-    }
-    
-    g_id = gutenberg_map.get(book_id, 84)
-    url = f"https://www.gutenberg.org/cache/epub/{g_id}/pg{g_id}.txt"
-    response = requests.get(url)
-    if response.status_code != 200:
-        raise Exception(f"Failed to download book from Gutenberg: {url}")
-        
-    text = response.text
-    if "*** START OF THE PROJECT GUTENBERG" in text:
-        text = text.split("*** START OF THE PROJECT GUTENBERG")[1].split("***")[1]
-    if "*** END OF THE PROJECT GUTENBERG" in text:
-        text = text.split("*** END OF THE PROJECT GUTENBERG")[0]
-
-    splitter = RecursiveCharacterTextSplitter(chunk_size=3000, chunk_overlap=200)
-    docs = splitter.split_documents([Document(page_content=text.strip(), metadata={"book_id": book_id})])
-    
-    vectors_to_upsert = []
-    total_vectors = pinecone_index.describe_index_stats().get("total_vector_count", 0)
-    embeddings = get_embeddings_model()
-
-    for idx, chunk in enumerate(docs[:15] if len(docs) > 15 else docs):
-        meta = extract_chunk_metadata(chunk.page_content, book_id, idx)
-        payload = {
-            "text": chunk.page_content,
-            "page_content": chunk.page_content,
-            "book_id": book_id,
-            "section_id": int(meta.get("section_id", (idx // 3) + 1)),
-            "active_characters": list(meta.get("active_characters", [])),
-            "chunk_summary": str(meta.get("summary", "")),
-            "source": f"gutenberg_{g_id}"
-        }
-        vector = embeddings.embed_query(chunk.page_content)
-        vectors_to_upsert.append({
-            "id": f"chunk_{total_vectors + idx}",
-            "values": vector,
-            "metadata": payload
-        })
-        time.sleep(2)
-        
-    pinecone_index.upsert(vectors=vectors_to_upsert)
-    return True
+    """Removes chain-of-thought blocks from reasoning models."""
+    if not text:
+        return ""
+    cleaned = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
+    cleaned = re.sub(r'<think>.*', '', cleaned, flags=re.DOTALL)
+    return cleaned.strip()
 
 
 # ==========================================
@@ -139,7 +46,7 @@ def check_and_lazy_ingest_book(book_id: str):
 # ==========================================
 
 def get_original_section_text(book_id: str, section_id: int) -> str:
-    """Fetches raw text with Redis caching to avoid repeat vector queries."""
+    """Fetches raw text via Pinecone metadata filtering with Redis caching."""
     cache_key = f"rawtext:{book_id}:section_{section_id}"
     
     if REDIS_AVAILABLE:
@@ -147,21 +54,24 @@ def get_original_section_text(book_id: str, section_id: int) -> str:
         if cached:
             return cached
 
-    check_and_lazy_ingest_book(book_id)
-    
-    v_store = get_vector_store()
-    retriever = v_store.as_retriever(
-        search_kwargs={"filter": {"book_id": book_id, "section_id": section_id}, "k": 5}
+    results = pinecone_index.query(
+        vector=[0.0] * 384,
+        filter={"book_id": {"$eq": book_id}, "section_id": {"$eq": section_id}},
+        top_k=5,
+        include_metadata=True
     )
-    docs = retriever.invoke(f"What happens in section {section_id}?")
     
-    if not docs:
-        retriever_fallback = v_store.as_retriever(
-            search_kwargs={"filter": {"book_id": book_id}, "k": 5}
+    matches = results.get("matches", [])
+    if not matches:
+        results = pinecone_index.query(
+            vector=[0.0] * 384,
+            filter={"book_id": {"$eq": book_id}},
+            top_k=5,
+            include_metadata=True
         )
-        docs = retriever_fallback.invoke(f"Section {section_id}")
-        
-    raw_text = "\n\n".join([doc.page_content for doc in docs]) if docs else "Original text not available."
+        matches = results.get("matches", [])
+
+    raw_text = "\n\n".join([m.get("metadata", {}).get("text", "") for m in matches]) if matches else "Original text not available."
 
     if REDIS_AVAILABLE and raw_text:
         redis_client.set(cache_key, raw_text)
@@ -170,7 +80,7 @@ def get_original_section_text(book_id: str, section_id: int) -> str:
 
 
 def get_section_characters(book_id: str, section_id: int) -> list[str]:
-    """Fetches dynamic characters with Redis caching to save token extraction."""
+    """Fetches dynamic characters from Pinecone metadata with Redis caching."""
     cache_key = f"chars:{book_id}:section_{section_id}"
     
     if REDIS_AVAILABLE:
@@ -181,8 +91,6 @@ def get_section_characters(book_id: str, section_id: int) -> list[str]:
             except Exception:
                 pass
 
-    check_and_lazy_ingest_book(book_id)
-    
     results = pinecone_index.query(
         vector=[0.0] * 384,
         filter={"book_id": {"$eq": book_id}, "section_id": {"$eq": section_id}},
@@ -255,7 +163,7 @@ def retrieve_and_generate_pov(book_id: str, section_id: int, target_character: s
     target_scene_text = get_original_section_text(book_id, section_id)
     historical_summary = get_cumulative_summary(book_id, section_id)
 
-    if target_character.lower() == "author intent":
+    if target_character.lower() in ["author intent", "original author intent"]:
         system_persona = (
             "You are an objective literary scholar. Explain the underlying themes, "
             "foreshadowing, narrative tension, and structural intent behind the provided scene."
@@ -298,7 +206,11 @@ def retrieve_and_generate_pov(book_id: str, section_id: int, target_character: s
             temperature=0.7,
             max_tokens=1000
         )
-        generated_output = clean_think_tags(response.choices[0].message.content)
+        raw_output = response.choices[0].message.content
+        generated_output = clean_think_tags(raw_output)
+
+        if not generated_output:
+            generated_output = raw_output.strip()
 
         if REDIS_AVAILABLE:
             redis_client.set(pov_cache_key, generated_output)
@@ -316,10 +228,7 @@ def retrieve_and_generate_pov(book_id: str, section_id: int, target_character: s
 
 
 def query_narrative_graph(book_id: str, section_id: int, query: str) -> str:
-    """
-    Executes graph relationship search and formats output into 
-    clear, easy-to-read narrative insights using available free Groq model.
-    """
+    """Executes relationship search using Groq."""
     if not query.strip():
         return "Please enter a specific question about character relationships or events."
 
