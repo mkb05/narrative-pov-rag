@@ -66,6 +66,9 @@ export default function NewspaperHome() {
 
   const [loadingGraphSearch, setLoadingGraphSearch] = useState(false);
 
+  const BACKEND_URL =
+    process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+
   const filteredBooks =
     selectedCategory === "all"
       ? MOCK_BOOKS
@@ -77,7 +80,7 @@ export default function NewspaperHome() {
     setSearchResult("");
 
     try {
-      const res = await fetch("http://127.0.0.1:8000/api/graph-search", {
+      const res = await fetch(`${BACKEND_URL}/api/graph-search`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -105,7 +108,7 @@ export default function NewspaperHome() {
       setLoadingOriginal(true);
       try {
         const res = await fetch(
-          `http://127.0.0.1:8000/api/section-text?book_id=${currentBookId}&section_id=${sectionId}`,
+          `${BACKEND_URL}/api/section-text?book_id=${currentBookId}&section_id=${sectionId}`,
         );
         const data = await res.json();
         if (res.ok && data.original_text) {
@@ -129,7 +132,7 @@ export default function NewspaperHome() {
       setLoadingCharacters(true);
       try {
         const res = await fetch(
-          `http://127.0.0.1:8000/api/characters?book_id=${currentBookId}&section_id=${sectionId}`,
+          `${BACKEND_URL}/api/characters?book_id=${currentBookId}&section_id=${sectionId}`,
         );
         const data = await res.json();
         if (res.ok && Array.isArray(data.characters)) {
@@ -165,7 +168,7 @@ export default function NewspaperHome() {
     setIsCachedResult(false);
 
     try {
-      const res = await fetch("http://127.0.0.1:8000/api/generate-pov", {
+      const res = await fetch(`${BACKEND_URL}/api/generate-pov`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
