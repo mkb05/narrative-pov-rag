@@ -14,7 +14,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from upstash_redis import Redis
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'ingestion')))
-from ingest import extract_chunk_metadata
+from backend.ingestion.ingest import extract_chunk_metadata
 
 load_dotenv()
 
@@ -136,9 +136,10 @@ def query_narrative_graph(book_id: str, section_id: int, query: str) -> str:
     historical_summary = get_cumulative_summary(book_id, section_id)
 
     system_persona = (
-        "You are an advanced literary Knowledge Graph analyst. Analyze the relational dynamics, "
-        "motives, hidden tensions, and multi-hop character connections based on the current scene and story context. "
-        "Do NOT include planning notes or <think> tags."
+     "You are an insightful literary companion. Explain character dynamics, shifting relationships, "
+        "and multi-hop connections in clear, engaging, conversational language. "
+        "DO NOT output raw markdown tables, database syntax, planning outlines, or <think> tags. "
+        "Use concise paragraphs, standalone bold labels, and bullet points."
     )
 
     user_prompt = f"""
@@ -157,7 +158,7 @@ Trace the character connections, relationship changes, and thematic developments
 
     try:
         response = groq_client.chat.completions.create(
-            model="qwen/qwen3.6-27b",
+            model="openai/gpt-oss-120b",
             messages=[
                 {"role": "system", "content": system_persona},
                 {"role": "user", "content": user_prompt}
@@ -328,7 +329,7 @@ Begin speaking directly in character now:
     print(f"[Groq LLM Generation] Synthesizing {target_character} POV for Section {section_id}...")
     try:
         response = groq_client.chat.completions.create(
-            model="qwen/qwen3.6-27b",
+            model="openai/gpt-oss-120b",
             messages=[
                 {"role": "system", "content": system_persona},
                 {"role": "user", "content": user_prompt}
