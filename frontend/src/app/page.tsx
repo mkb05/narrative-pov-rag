@@ -333,7 +333,7 @@ export default function NewspaperHome() {
                     className="w-16 border border-black p-1 bg-white font-serif text-sm text-center"
                   />
                 </div>
-                <div className="flex gap-2 font-sans text-xs">
+                <div className="flex gap-2 font-sans text-xs w-full sm:w-auto justify-end">
                   <button
                     disabled={sectionId <= 1}
                     onClick={() =>
@@ -345,7 +345,7 @@ export default function NewspaperHome() {
                   </button>
                   <button
                     onClick={() => setSectionId((prev) => prev + 1)}
-                    className="border border-black px-3 py-1 hover:bg-stone-200"
+                    className="flex-1 sm:flex-none border border-black px-3 py-1 hover:bg-stone-200"
                   >
                     Next &rarr;
                   </button>
