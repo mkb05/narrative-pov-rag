@@ -1,3 +1,5 @@
+import json
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -76,6 +78,29 @@ def generate_pov_endpoint(request: POVRequest):
             "character": request.target_character,
             "content": result.get("pov_content", ""),
             "original_text": result.get("original_text", "")
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/catalog")
+def get_catalog_endpoint():
+    """Fetches the full book catalog from Upstash Redis."""
+    try:
+        from backend.rag.engine import redis_client, REDIS_AVAILABLE
+        if REDIS_AVAILABLE:
+            data = redis_client.get("app:book_catalog")
+            if data:
+                return {"books": json.loads(data) if isinstance(data, str) else data}
+        
+        # Fallback default catalog if Redis key is missing
+        return {
+            "books": [
+                {"id": "frankenstein", "title": "Frankenstein", "category": "horror", "author": "Mary Shelley", "desc": "A gothic masterpiece."},
+                {"id": "pride_and_prejudice", "title": "Pride and Prejudice", "category": "romance", "author": "Jane Austen", "desc": "A classic comedy of manners."},
+                {"id": "dracula", "title": "Dracula", "category": "horror", "author": "Bram Stoker", "desc": "The iconic epistolary novel."},
+                {"id": "the_adventures_of_sherlock_holmes", "title": "The Adventures of Sherlock Holmes", "category": "mystery", "author": "Arthur Conan Doyle", "desc": "Stories featuring the consulting detective."}
+            ]
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
