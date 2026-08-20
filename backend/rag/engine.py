@@ -10,7 +10,7 @@ from pinecone import Pinecone
 from upstash_redis import Redis
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_pinecone import PineconeEmbeddings
 
 # Ensure ingestion modules can be imported
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'ingestion')))
@@ -35,12 +35,8 @@ pinecone_index = pc.Index(pinecone_index_name)
 _embeddings_model = None
 
 def get_embeddings_model():
-    """Lazily loads HuggingFace embedding weights only when first requested."""
-    global _embeddings_model
-    if _embeddings_model is None:
-        print("[RAG Engine] Lazily loading HuggingFaceEmbeddings (all-MiniLM-L6-v2)...")
-        _embeddings_model = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
-    return _embeddings_model
+    """Uses Pinecone's hosted serverless embeddings (Zero local RAM overhead)."""
+    return PineconeEmbeddings(model="multilingual-e5-large")
 
 # Initialize Upstash Redis
 try:
@@ -102,7 +98,26 @@ def check_and_lazy_ingest_book(book_id: str):
         g_id = fallback_map.get(book_id, 84)
 
     url = f"https://www.gutenberg.org/cache/epub/{g_id}/pg{g_id}.txt"
-    response = requests.get(url, timeout=15)
+
+    #   standard User-Agent header so Gutenberg doesn't block the request
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    }
+
+    # FIX: Add a retry mechanism for dropped connections
+    response = None
+    for attempt in range(3):
+        try:
+            response = requests.get(url, headers=headers, timeout=20)
+            if response.status_code == 200:
+                break
+        except requests.exceptions.RequestException as e:
+            print(f"[Lazy Ingestion] Attempt {attempt + 1} failed: {e}")
+            time.sleep(2)
+            if attempt == 2:
+                raise Exception(f"Failed to download book from Gutenberg URL {url} after 3 attempts.")
+
+            
     if response.status_code != 200:
         raise Exception(f"Failed to download book from Gutenberg URL: {url}")
         
@@ -158,6 +173,7 @@ def check_and_lazy_ingest_book(book_id: str):
         
     if vectors_to_upsert:
         pinecone_index.upsert(vectors=vectors_to_upsert)
+        time.sleep(2.5)
 
     print(f"[Lazy Ingestion] Successfully processed and indexed '{book_id}'!")
     time.sleep(2) 
@@ -203,18 +219,25 @@ def get_section_characters(book_id: str, section_id: int) -> list[str]:
 
     check_and_lazy_ingest_book(book_id)
     
+    # 2. Query Pinecone metadata with a higher top_k to aggregate across all chunk variations
     results = pinecone_index.query(
-        vector=[0.0] * 384,
-        filter={"book_id": {"$eq": book_id}, "section_id": {"$eq": section_id}},
-        top_k=5,
+        vector=[0.0] * 1024,  # Matches your new 1024-dim index
+        filter={
+            "$and": [
+                {"book_id": {"$eq": book_id}},
+                {"section_id": {"$eq": section_id}}
+            ]
+        },
+        top_k=15,  # Fetch more chunks to ensure we catch non-empty metadata
         include_metadata=True
     )
+
     
     if not results.get("matches"):
         results = pinecone_index.query(
-            vector=[0.0] * 384,
+            vector=[0.0] * 1024,
             filter={"book_id": {"$eq": book_id}},
-            top_k=10,
+            top_k=15,
             include_metadata=True
         )
 
