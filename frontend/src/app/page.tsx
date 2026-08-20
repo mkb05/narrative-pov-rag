@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
 
-const MOCK_BOOKS = [
+// 20 robust fallback books to show instantly while the API fetches the full Redis catalog
+const FALLBACK_BOOKS = [
   {
     id: "frankenstein",
     title: "Frankenstein",
@@ -32,9 +33,123 @@ const MOCK_BOOKS = [
     author: "Arthur Conan Doyle",
     desc: "A collection of twelve short stories featuring the brilliant consulting detective.",
   },
+  {
+    id: "moby_dick",
+    title: "Moby Dick",
+    category: "adventure",
+    author: "Herman Melville",
+    desc: "The epic tale of Captain Ahab's obsessive hunt for the white whale.",
+  },
+  {
+    id: "jane_eyre",
+    title: "Jane Eyre",
+    category: "romance",
+    author: "Charlotte Brontë",
+    desc: "Follows the emotions and experiences of its eponymous heroine as she grows up.",
+  },
+  {
+    id: "the_time_machine",
+    title: "The Time Machine",
+    category: "science fiction",
+    author: "H.G. Wells",
+    desc: "A seminal science fiction novella that popularized the concept of time travel.",
+  },
+  {
+    id: "alice_in_wonderland",
+    title: "Alice in Wonderland",
+    category: "fantasy",
+    author: "Lewis Carroll",
+    desc: "A young girl falls down a rabbit hole into a fantasy world.",
+  },
+  {
+    id: "the_great_gatsby",
+    title: "The Great Gatsby",
+    category: "fiction",
+    author: "F. Scott Fitzgerald",
+    desc: "A tragic story of jazz, wealth, and the impossible American Dream.",
+  },
+  {
+    id: "crime_and_punishment",
+    title: "Crime and Punishment",
+    category: "fiction",
+    author: "Fyodor Dostoevsky",
+    desc: "A psychological drama about a young student's moral dilemma after committing a crime.",
+  },
+  {
+    id: "the_picture_of_dorian_gray",
+    title: "The Picture of Dorian Gray",
+    category: "fiction",
+    author: "Oscar Wilde",
+    desc: "A young man stays forever youthful while his portrait ages and decays.",
+  },
+  {
+    id: "wuthering_heights",
+    title: "Wuthering Heights",
+    category: "romance",
+    author: "Emily Brontë",
+    desc: "A dark, passionate tale of love and revenge on the Yorkshire moors.",
+  },
+  {
+    id: "the_count_of_monte_cristo",
+    title: "The Count of Monte Cristo",
+    category: "adventure",
+    author: "Alexandre Dumas",
+    desc: "A thrilling tale of wrongful imprisonment and spectacular revenge.",
+  },
+  {
+    id: "a_tale_of_two_cities",
+    title: "A Tale of Two Cities",
+    category: "history",
+    author: "Charles Dickens",
+    desc: "A story of love and sacrifice set against the backdrop of the French Revolution.",
+  },
+  {
+    id: "les_miserables",
+    title: "Les Misérables",
+    category: "fiction",
+    author: "Victor Hugo",
+    desc: "An epic story of injustice, heroism, and love in 19th-century France.",
+  },
+  {
+    id: "the_odyssey",
+    title: "The Odyssey",
+    category: "poetry",
+    author: "Homer",
+    desc: "The epic journey of Odysseus as he attempts to return home after the Trojan War.",
+  },
+  {
+    id: "the_iliad",
+    title: "The Iliad",
+    category: "poetry",
+    author: "Homer",
+    desc: "The legendary tale of the wrath of Achilles during the Trojan War.",
+  },
+  {
+    id: "don_quixote",
+    title: "Don Quixote",
+    category: "fiction",
+    author: "Miguel de Cervantes",
+    desc: "The comedic and tragic adventures of a man who believes he is a knight.",
+  },
+  {
+    id: "war_and_peace",
+    title: "War and Peace",
+    category: "history",
+    author: "Leo Tolstoy",
+    desc: "A sweeping historical epic chronicling the French invasion of Russia.",
+  },
+  {
+    id: "the_brothers_karamazov",
+    title: "The Brothers Karamazov",
+    category: "fiction",
+    author: "Fyodor Dostoevsky",
+    desc: "A passionate philosophical novel exploring faith, doubt, and morality.",
+  },
 ];
 
 export default function NewspaperHome() {
+  const [books, setBooks] = useState<any[]>(FALLBACK_BOOKS);
+  const [loadingCatalog, setLoadingCatalog] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [activeBook, setActiveBook] = useState<any | null>(null);
 
@@ -44,7 +159,7 @@ export default function NewspaperHome() {
   const [currentBookTitle, setCurrentBookTitle] = useState("Frankenstein");
   const [readingMode, setReadingMode] = useState<"original" | "pov">(
     "original",
-  ); // Switch Mode
+  );
 
   const [sectionId, setSectionId] = useState<number>(1);
   const [targetCharacter, setTargetCharacter] = useState("Author Intent");
@@ -63,16 +178,42 @@ export default function NewspaperHome() {
   const [sliderValue, setSliderValue] = useState(1);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResult, setSearchResult] = useState("");
-
   const [loadingGraphSearch, setLoadingGraphSearch] = useState(false);
 
   const BACKEND_URL =
     process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
+  // Fetch Full Catalog from Backend API (Redis)
+  useEffect(() => {
+    const fetchCatalog = async () => {
+      try {
+        const res = await fetch(`${BACKEND_URL}/api/catalog`);
+        const data = await res.json();
+        if (res.ok && Array.isArray(data.books) && data.books.length > 0) {
+          setBooks(data.books);
+        }
+      } catch (err) {
+        console.error(
+          "Failed to load full catalog from API. Using fallback.",
+          err,
+        );
+      } finally {
+        setLoadingCatalog(false);
+      }
+    };
+    fetchCatalog();
+  }, [BACKEND_URL]);
+
+  // Dynamically extract unique categories from loaded books
+  const categories = [
+    "all",
+    ...Array.from(new Set(books.map((b) => b.category))),
+  ];
+
   const filteredBooks =
     selectedCategory === "all"
-      ? MOCK_BOOKS
-      : MOCK_BOOKS.filter((b) => b.category === selectedCategory);
+      ? books
+      : books.filter((b) => b.category === selectedCategory);
 
   const handleGraphSearch = async () => {
     if (!searchQuery.trim()) return;
@@ -122,7 +263,7 @@ export default function NewspaperHome() {
     };
 
     fetchRawText();
-  }, [inWorkspace, currentBookId, sectionId]);
+  }, [inWorkspace, currentBookId, sectionId, BACKEND_URL]);
 
   // Fetch Cached Characters when in POV Mode
   useEffect(() => {
@@ -146,7 +287,7 @@ export default function NewspaperHome() {
     };
 
     fetchCharacters();
-  }, [inWorkspace, readingMode, currentBookId, sectionId]);
+  }, [inWorkspace, readingMode, currentBookId, sectionId, BACKEND_URL]);
 
   const handleEnterWorkspace = (book: any) => {
     setActiveBook(null);
@@ -208,7 +349,7 @@ export default function NewspaperHome() {
       {!inWorkspace ? (
         <>
           <nav className="flex justify-center gap-4 mb-6 font-sans text-xs uppercase tracking-wider flex-wrap">
-            {["all", "horror", "romance", "mystery"].map((cat) => (
+            {categories.map((cat) => (
               <button
                 key={cat}
                 onClick={() => setSelectedCategory(cat)}
@@ -298,13 +439,21 @@ export default function NewspaperHome() {
             <div className="flex border border-black p-0.5 bg-stone-100 font-sans text-xs font-bold uppercase">
               <button
                 onClick={() => setReadingMode("original")}
-                className={`px-4 py-1.5 transition ${readingMode === "original" ? "bg-[#2c2c2c] text-[#f4f1ea]" : "text-stone-600 hover:text-black"}`}
+                className={`px-4 py-1.5 transition ${
+                  readingMode === "original"
+                    ? "bg-[#2c2c2c] text-[#f4f1ea]"
+                    : "text-stone-600 hover:text-black"
+                }`}
               >
                 📜 Original Book Text
               </button>
               <button
                 onClick={() => setReadingMode("pov")}
-                className={`px-4 py-1.5 transition ${readingMode === "pov" ? "bg-amber-800 text-white" : "text-stone-600 hover:text-black"}`}
+                className={`px-4 py-1.5 transition ${
+                  readingMode === "pov"
+                    ? "bg-amber-800 text-white"
+                    : "text-stone-600 hover:text-black"
+                }`}
               >
                 🎭 Character POV & Insights
               </button>
@@ -315,7 +464,7 @@ export default function NewspaperHome() {
             </span>
           </div>
 
-          {/* MODE 1: ORIGINAL BOOK TEXT (FULL WIDTH, ZERO TOKEN BURN) */}
+          {/* MODE 1: ORIGINAL BOOK TEXT */}
           {readingMode === "original" && (
             <div className="space-y-4 max-w-4xl mx-auto">
               <div className="flex justify-between items-center bg-stone-100 border border-stone-300 p-3">
@@ -490,7 +639,6 @@ export default function NewspaperHome() {
                         </button>
                         {searchResult && (
                           <div className="text-[12px] mt-3 text-indigo-950 bg-indigo-50/80 p-3 border border-indigo-200 leading-relaxed max-h-60 overflow-y-auto font-serif">
-                            {/* Move the typography classes to a wrapper div */}
                             <div className="prose prose-sm prose-indigo max-w-none">
                               <ReactMarkdown>{searchResult}</ReactMarkdown>
                             </div>
