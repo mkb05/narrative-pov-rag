@@ -2,10 +2,22 @@ import os
 import sys
 import json
 import re
+import time
+import requests
 from dotenv import load_dotenv
 from groq import Groq
 from pinecone import Pinecone
 from upstash_redis import Redis
+from langchain_core.documents import Document
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_huggingface import HuggingFaceEmbeddings
+
+# Ensure ingestion modules can be imported
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'ingestion')))
+try:
+    from ingest import extract_chunk_metadata
+except ImportError:
+    pass
 
 load_dotenv()
 
@@ -16,6 +28,19 @@ groq_client = Groq(api_key=os.getenv("GROQ_API_KEY_GENERATION"))
 pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
 pinecone_index_name = os.getenv("PINECONE_INDEX_NAME", "literary-pov-master")
 pinecone_index = pc.Index(pinecone_index_name)
+
+# ==========================================
+# LAZY LOADING EMBEDDINGS
+# ==========================================
+_embeddings_model = None
+
+def get_embeddings_model():
+    """Lazily loads HuggingFace embedding weights only when first requested."""
+    global _embeddings_model
+    if _embeddings_model is None:
+        print("[RAG Engine] Lazily loading HuggingFaceEmbeddings (all-MiniLM-L6-v2)...")
+        _embeddings_model = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+    return _embeddings_model
 
 # Initialize Upstash Redis
 try:
@@ -42,55 +67,142 @@ def clean_think_tags(text: str) -> str:
 
 
 # ==========================================
+# ON-DEMAND LAZY INGESTION (DUAL STORAGE)
+# ==========================================
+def check_and_lazy_ingest_book(book_id: str):
+    """
+    Fetches book from Gutenberg, splits it into genuine structural sections,
+    stores them individually into Redis, and indexes chunks into Pinecone.
+    """
+    # Check if section 1 already exists in Redis
+    if REDIS_AVAILABLE and redis_client.get(f"rawtext:{book_id}:section_1"):
+        return True
+
+    print(f"[Lazy Ingestion] Book '{book_id}' missing in storage. Fetching on-demand...")
+
+    # Fetch Gutenberg ID dynamically or via fallback map
+    g_id = None
+    if REDIS_AVAILABLE:
+        try:
+            raw_map = redis_client.get("app:gutenberg_map")
+            if raw_map:
+                g_map = json.loads(raw_map) if isinstance(raw_map, (str, bytes)) else raw_map
+                g_id = g_map.get(book_id)
+        except Exception:
+            pass
+
+    if not g_id:
+        fallback_map = {
+            "frankenstein": 84,
+            "pride_and_prejudice": 1342,
+            "dracula": 345,
+            "the_adventures_of_sherlock_holmes": 1661,
+            "the_time_machine": 35
+        }
+        g_id = fallback_map.get(book_id, 84)
+
+    url = f"https://www.gutenberg.org/cache/epub/{g_id}/pg{g_id}.txt"
+    response = requests.get(url, timeout=15)
+    if response.status_code != 200:
+        raise Exception(f"Failed to download book from Gutenberg URL: {url}")
+        
+    text = response.text
+    if "*** START OF THE PROJECT GUTENBERG" in text:
+        after_start = text.split("*** START OF THE PROJECT GUTENBERG")[1]
+        text = after_start.split("***")[1] if "***" in after_start else after_start
+    if "*** END OF THE PROJECT GUTENBERG" in text:
+        text = text.split("*** END OF THE PROJECT GUTENBERG")[0]
+
+    text = text.strip()
+
+    # Split text into reliable sections (by chapters or chunk blocks)
+    # Using RecursiveCharacterTextSplitter to create clean uniform sections of ~4000 characters each
+    section_splitter = RecursiveCharacterTextSplitter(chunk_size=4000, chunk_overlap=0, separators=["CHAPTER", "\n\n\n", "\n\n"])
+    section_docs = section_splitter.split_documents([Document(page_content=text)])
+
+    if REDIS_AVAILABLE:
+        for idx, sec_doc in enumerate(section_docs):
+            redis_client.set(f"rawtext:{book_id}:section_{idx + 1}", sec_doc.page_content.strip())
+        print(f"[Redis Document Store] Stored {len(section_docs)} distinct sections for '{book_id}' in Redis.")
+
+    # Process smaller overlapping chunks for Pinecone Vector DB (AI features)
+    vector_splitter = RecursiveCharacterTextSplitter(chunk_size=1500, chunk_overlap=150)
+    docs = vector_splitter.split_documents([Document(page_content=text, metadata={"book_id": book_id})])
+    
+    vectors_to_upsert = []
+    total_vectors = pinecone_index.describe_index_stats().get("total_vector_count", 0)
+    embeddings = get_embeddings_model()
+
+    for idx, chunk in enumerate(docs[:20] if len(docs) > 20 else docs):
+        section_id = (idx // 2) + 1  # Map chunks logically to sections
+        try:
+            meta = extract_chunk_metadata(chunk.page_content, book_id, idx)
+        except NameError:
+            meta = {"active_characters": [], "summary": ""}
+            
+        payload = {
+            "text": chunk.page_content,
+            "page_content": chunk.page_content,
+            "book_id": book_id,
+            "section_id": section_id,
+            "active_characters": list(meta.get("active_characters", [])),
+            "chunk_summary": str(meta.get("summary", "")),
+            "source": f"gutenberg_{g_id}"
+        }
+        vector = embeddings.embed_query(chunk.page_content)
+        vectors_to_upsert.append({
+            "id": f"chunk_{total_vectors + idx}",
+            "values": vector,
+            "metadata": payload
+        })
+        
+    if vectors_to_upsert:
+        pinecone_index.upsert(vectors=vectors_to_upsert)
+
+    print(f"[Lazy Ingestion] Successfully processed and indexed '{book_id}'!")
+    time.sleep(2) 
+    return True
+
+
+# ==========================================
 # CACHED SECTION TEXT & DYNAMIC CHARACTERS
 # ==========================================
-
 def get_original_section_text(book_id: str, section_id: int) -> str:
-    """Fetches raw text via Pinecone metadata filtering with Redis caching."""
+    """Fetches raw text strictly from Redis (Document DB). No vector lookups needed for reading!"""
     cache_key = f"rawtext:{book_id}:section_{section_id}"
     
+    # 1. Attempt standard Redis retrieval
     if REDIS_AVAILABLE:
         cached = redis_client.get(cache_key)
         if cached:
-            return cached
+            return cached if isinstance(cached, str) else cached.decode("utf-8")
 
-    results = pinecone_index.query(
-        vector=[0.0] * 384,
-        filter={"book_id": {"$eq": book_id}, "section_id": {"$eq": section_id}},
-        top_k=5,
-        include_metadata=True
-    )
-    
-    matches = results.get("matches", [])
-    if not matches:
-        results = pinecone_index.query(
-            vector=[0.0] * 384,
-            filter={"book_id": {"$eq": book_id}},
-            top_k=5,
-            include_metadata=True
-        )
-        matches = results.get("matches", [])
+    # 2. If missing, trigger lazy ingestion pipeline
+    check_and_lazy_ingest_book(book_id)
 
-    raw_text = "\n\n".join([m.get("metadata", {}).get("text", "") for m in matches]) if matches else "Original text not available."
+    # 3. Retrieve newly populated text from Redis
+    if REDIS_AVAILABLE:
+        cached = redis_client.get(cache_key)
+        if cached:
+            return cached if isinstance(cached, str) else cached.decode("utf-8")
 
-    if REDIS_AVAILABLE and raw_text:
-        redis_client.set(cache_key, raw_text)
-
-    return raw_text
+    return "Original text not available for this section."
 
 
 def get_section_characters(book_id: str, section_id: int) -> list[str]:
-    """Fetches dynamic characters from Pinecone metadata with Redis caching."""
+    """Fetches dynamic characters from Pinecone metadata with Redis caching and token-safe Groq fallback."""
     cache_key = f"chars:{book_id}:section_{section_id}"
     
     if REDIS_AVAILABLE:
         cached = redis_client.get(cache_key)
         if cached:
             try:
-                return json.loads(cached)
+                return json.loads(cached) if isinstance(cached, (str, bytes)) else cached
             except Exception:
                 pass
 
+    check_and_lazy_ingest_book(book_id)
+    
     results = pinecone_index.query(
         vector=[0.0] * 384,
         filter={"book_id": {"$eq": book_id}, "section_id": {"$eq": section_id}},
@@ -117,7 +229,50 @@ def get_section_characters(book_id: str, section_id: int) -> list[str]:
 
     char_list = sorted(list(characters))
 
-    if REDIS_AVAILABLE:
+# 3. FALLBACK: If characters are still empty, extract safely on-the-fly via Groq
+    if not char_list:
+        print(f"[RAG Engine] Character list empty for '{book_id}' section {section_id}. Extracting via Groq on-the-fly...")
+        scene_text = get_original_section_text(book_id, section_id)
+        
+        if scene_text and scene_text != "Original text not available for this section.":
+            try:
+                safe_scene_text = scene_text  # Keep it safely within token bounds
+                extraction_prompt = (
+                    f"List the names of all the characters present, speaking, or actively mentioned in this text excerpt from '{book_id}' (Section {section_id}). "
+                    "Provide a simple comma-separated list of names (e.g., Elizabeth Bennet, Mr. Darcy, Jane). "
+                    "Do not include extra text, explanations, or markdown."
+                )
+                response = groq_client.chat.completions.create(
+                    model="openai/gpt-oss-120b",
+                    messages=[
+                        {"role": "system", "content": "You are a precise literary data extractor. Output only names separated by commas."},
+                        {"role": "user", "content": f"{extraction_prompt}\n\nText:\n{scene_text}"}
+                    ],
+                    temperature=0.1,
+                    max_tokens=150
+                )
+                print("response",response)
+                raw_content = clean_think_tags(response.choices[0].message.content)
+                print("raw content:", raw_content)
+                
+                # Parse lines or comma separation safely using basic text cleaning
+                if raw_content:
+                    # Clean up common conversational artifacts if present
+                    cleaned = raw_content.replace("Characters:", "").replace("-", "").strip()
+                    # Split by commas or newlines
+                    potential_chars = re.split(r'[\n,]+', cleaned)
+                    for c in potential_chars:
+                        clean_name = c.strip(" '\"*._-")
+                        if clean_name and len(clean_name) < 40 and not clean_name.lower().startswith("none"):
+                            characters.add(clean_name)
+                            
+                char_list = sorted(list(characters))
+            except Exception as e:
+                import traceback
+                print(f"[RAG Engine] On-the-fly character extraction failed with error: {e}")
+                traceback.print_exc()
+
+    if REDIS_AVAILABLE and char_list:
         redis_client.set(cache_key, json.dumps(char_list))
 
     return char_list
@@ -126,7 +281,6 @@ def get_section_characters(book_id: str, section_id: int) -> list[str]:
 # ==========================================
 # CACHED POV GENERATION & PROGRESSIVE SUMMARY
 # ==========================================
-
 def get_cumulative_summary(book_id: str, section_id: int) -> str:
     if section_id <= 1:
         return "This is the beginning of the narrative."
@@ -134,7 +288,8 @@ def get_cumulative_summary(book_id: str, section_id: int) -> str:
     cache_key = f"summary:{book_id}:section_{section_id - 1}"
     if REDIS_AVAILABLE:
         val = redis_client.get(cache_key)
-        return val if val else "Prior events leading up to this section."
+        if val:
+            return val if isinstance(val, str) else val.decode("utf-8")
     return "Prior events leading up to this section."
 
 
@@ -145,66 +300,48 @@ def save_cumulative_summary(book_id: str, section_id: int, summary_text: str):
 
 
 def retrieve_and_generate_pov(book_id: str, section_id: int, target_character: str):
-    """
-    Checks Redis first for cached POV monologues.
-    Only queries Groq if the exact perspective is not cached.
-    """
     pov_cache_key = f"pov:{book_id}:section_{section_id}:{target_character.replace(' ', '_').lower()}"
     
     if REDIS_AVAILABLE:
         cached_pov = redis_client.get(pov_cache_key)
         if cached_pov:
-            print(f"[Redis Cache HIT] Returning cached POV for {target_character} in section {section_id}")
             return {
-                "pov_content": cached_pov,
+                "pov_content": cached_pov if isinstance(cached_pov, str) else cached_pov.decode("utf-8"),
                 "cached": True
             }
 
     target_scene_text = get_original_section_text(book_id, section_id)
     historical_summary = get_cumulative_summary(book_id, section_id)
 
+    # TRUNCATE TOKENS SAFELY: Keep scene text under ~3,000 characters (~750 tokens) to stay well under TPM limits
+    safe_scene_text = target_scene_text[:3000] if target_scene_text else ""
+    safe_history = historical_summary[:1000] if historical_summary else ""
+
     if target_character.lower() in ["author intent", "original author intent"]:
         system_persona = (
-            "You are an objective literary scholar. Explain the underlying themes, "
-            "foreshadowing, narrative tension, and structural intent behind the provided scene."
+            "You are the author reflecting on your work. Explain your narrative choices, "
+            "thematic goals, and character dynamics in this section in an engaging, conversational literary voice. "
+            "Do NOT include planning notes, lists of constraints, or chain-of-thought tags."
         )
-        task_instruction = (
-            f"Analyze the scene below from '{book_id}' (Section {section_id}). "
-            "Do NOT provide meta-notes or chain-of-thought blocks. Output only the thematic critique."
-        )
+        user_prompt = f"Book: {book_id} (Section {section_id})\nPrior Plot Context: {safe_history}\nCanonical Text of This Scene:\n{safe_scene_text}\n\nTask:\nExplain what is happening in this scene, why you wrote it this way, and the underlying tension between the characters. \nBegin your response immediately:\n"
     else:
         system_persona = (
-            f"You are {target_character}. You exist entirely inside the world of this book. "
-            "Speak directly in the first person ('I', 'me', 'my'). Express your raw emotions, "
-            "internal motivations, and immediate reactions to this exact scene."
+            f"You are {target_character} from '{book_id}'. You are recounting and explaining the events of this scene "
+            f"directly to the reader in your own distinct voice and personality. Use first-person ('I', 'me', 'my'). "
+            f"Focus on your emotions, motives, reactions, and internal monologue during these events. "
+            f"Do NOT break character. Do NOT explain what you are doing. Do NOT output analysis or <think> tags."
         )
-        task_instruction = (
-            f"Retell and experience this scene directly as {target_character}. "
-            "Do NOT introduce yourself, do NOT analyze the text as a reader, and do NOT include think tags. "
-            "Begin directly in character:"
-        )
+        user_prompt = f"Prior Background: {safe_history}\nThe Events Happening in This Scene:\n{safe_scene_text}\n\nTask:\nRecount and explain this scene as {target_character}. Tell me what happened, how you felt about it, and what you were thinking at that moment.\nBegin speaking directly in character now:\n"
 
-    prompt = f"""
-    [Historical Context / Previous Summary]:
-    {historical_summary}
-
-    [Target Scene Text (Section {section_id})]:
-    {target_scene_text}
-
-    [Task Instructions]:
-    {task_instruction}
-    """
-
-    print(f"[Groq LLM Generation] Synthesizing {target_character} POV for Section {section_id} via openai/gpt-oss-120b...")
     try:
         response = groq_client.chat.completions.create(
             model="openai/gpt-oss-120b",
             messages=[
                 {"role": "system", "content": system_persona},
-                {"role": "user", "content": prompt}
+                {"role": "user", "content": user_prompt}
             ],
             temperature=0.7,
-            max_tokens=1000
+            max_tokens=800
         )
         raw_output = response.choices[0].message.content
         generated_output = clean_think_tags(raw_output)
@@ -212,10 +349,10 @@ def retrieve_and_generate_pov(book_id: str, section_id: int, target_character: s
         if not generated_output:
             generated_output = raw_output.strip()
 
-        if REDIS_AVAILABLE:
+        if REDIS_AVAILABLE and generated_output:
             redis_client.set(pov_cache_key, generated_output)
 
-        new_summary = f"{historical_summary} -> Section {section_id} events: {target_scene_text[:300]}..."
+        new_summary = f"{safe_history} -> Section {section_id} events: {safe_scene_text[:200]}..."
         save_cumulative_summary(book_id, section_id, new_summary)
 
         return {
@@ -226,9 +363,9 @@ def retrieve_and_generate_pov(book_id: str, section_id: int, target_character: s
     except Exception as e:
         return {"pov_content": f"Generation failed due to Groq API error: {e}", "cached": False}
 
+    
 
 def query_narrative_graph(book_id: str, section_id: int, query: str) -> str:
-    """Executes relationship search using Groq."""
     if not query.strip():
         return "Please enter a specific question about character relationships or events."
 
@@ -243,16 +380,7 @@ def query_narrative_graph(book_id: str, section_id: int, query: str) -> str:
         "Use concise paragraphs, standalone bold labels, and bullet points."
     )
 
-    user_prompt = f"""
-Book: {book_id}
-Timeline Point: Section {section_id}
-Active Characters in Graph: {', '.join(chars) if chars else 'Primary Cast'}
-Narrative History: {historical_summary}
-Current Section Canonical Context:
-{scene_text[:2000]}
-
-User Graph Query: {query}
-"""
+    user_prompt = f"Book: {book_id}\nTimeline Point: Section {section_id}\nActive Characters in Graph: {', '.join(chars) if chars else 'Primary Cast'}\nNarrative History: {historical_summary}\nCurrent Section Canonical Context:\n{scene_text[:2000]}\n\nUser Graph Query: {query}\n"
 
     try:
         response = groq_client.chat.completions.create(
