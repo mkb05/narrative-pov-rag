@@ -1,5 +1,6 @@
 import os
 import json
+import time
 from bs4 import BeautifulSoup
 from ebooklib import epub
 from dotenv import load_dotenv
@@ -8,7 +9,6 @@ from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import TextLoader
 from pinecone import Pinecone
-from langchain_pinecone import PineconeVectorStore
 
 # Load environment variables from root .env file
 load_dotenv()
@@ -23,8 +23,17 @@ PINECONE_INDEX_NAME = os.getenv("PINECONE_INDEX_NAME", "literary-pov-master")
 pc = Pinecone(api_key=PINECONE_API_KEY)
 pinecone_index = pc.Index(PINECONE_INDEX_NAME)
 
-# Initialize a lightweight, free local embedding model
-embeddings_model = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+def get_serverless_embedding(text: str) -> list[float]:
+    """
+    Generates serverless embeddings using Pinecone Inference API.
+    Zero local RAM overhead (No PyTorch/Hugging Face required).
+    """
+    response = pc.inference.embed(
+        model="multilingual-e5-large",
+        inputs=[text],
+        parameters={"input_type": "passage"}
+    )
+    return response.data[0].values
 
 def load_epub_book(file_path: str):
     """Extracts clean plain text from an EPUB file using EbookLib and BeautifulSoup."""
@@ -44,12 +53,12 @@ def load_epub_book(file_path: str):
 
 def extract_chunk_metadata(chunk_text: str, book_title: str, chunk_index: int):
     """
-    Uses groq/compound-mini to extract active characters and assign a section ID.
+    Extracts active characters and assigns a section ID with a bulletproof JSON fallback.
     """
     prompt = f"""
     Analyze the following book excerpt from '{book_title}' (Chunk {chunk_index}).
     Extract the following information and return ONLY a valid JSON object with these keys:
-    - "section_id": An integer representing the estimated logical section or chapter sequence number.
+    - "section_id": An integer representing the estimated logical section or chapter sequence number (e.g. 1, 2, 3...).
     - "active_characters": A list of string names of characters explicitly present or actively mentioned as interacting in this specific chunk.
     - "summary": A concise 1-sentence summary of what happens in this chunk.
 
@@ -59,42 +68,51 @@ def extract_chunk_metadata(chunk_text: str, book_title: str, chunk_index: int):
 
     try:
         response = groq_client.chat.completions.create(
-            model="qwen/qwen3.6-27b",  # Updated to active free tier model
-            messages=[{"role": "user", "content": prompt}],
-            response_format={"type": "json_object"}
+            model="openai/gpt-oss-20b",  # Fast model with high availability
+            messages=[
+                {"role": "system", "content": "You are a precise data extractor. Output valid JSON only."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.1,
+            max_tokens=400
         )
-        return json.loads(response.choices[0].message.content)
+        raw_content = response.choices[0].message.content.strip()
+        cleaned_json = raw_content.replace("```json", "").replace("```", "").strip()
+        return json.loads(cleaned_json)
+        
     except Exception as e:
-        print(f"Metadata extraction failed for chunk {chunk_index}: {e}")
-        return {"section_id": chunk_index // 10, "active_characters": [], "summary": ""}
+        print(f"[Metadata Warning] Extraction failed for chunk {chunk_index}: {e}")
+        # Programmatic fallback so ingestion never throws a 500 error
+        return {
+            "section_id": (chunk_index // 3) + 1, 
+            "active_characters": [], 
+            "summary": chunk_text[:200] + "..."
+        }
 
 def push_chunks_to_pinecone(chunks):
     """
-    Converts chunks to vector embeddings and pushes them to Pinecone with metadata payloads.
+    Converts chunks to serverless vector embeddings and pushes them to Pinecone with metadata payloads.
     """
     print(f"\nConnecting to Pinecone index: '{PINECONE_INDEX_NAME}'...")
-    
-    print("Generating embeddings and uploading vectors to Pinecone...")
+    print("Generating serverless embeddings and uploading vectors to Pinecone...")
     
     vectors_to_upsert = []
-    
-    # Get current stats or set a base ID counter
     stats = pinecone_index.describe_index_stats()
     start_id = stats.get("total_vector_count", 0)
 
     for idx, chunk in enumerate(chunks):
-        vector = embeddings_model.embed_query(chunk.page_content)
+        # Generate serverless embedding via Pinecone Inference API (Zero local RAM)
+        vector = get_serverless_embedding(chunk.page_content)
         
-        # Pinecone metadata values must be strings, numbers, or lists of strings
         payload = {
-                "text": chunk.page_content, 
-                "page_content": chunk.page_content,
-                "book_id": str(chunk.metadata.get("book_id")),
-                "section_id": int(chunk.metadata.get("section_id", 0)),
-                "active_characters": list(chunk.metadata.get("active_characters", [])),
-                "chunk_summary": str(chunk.metadata.get("chunk_summary", "")),
-                "source": str(chunk.metadata.get("source", ""))
-            }
+            "text": chunk.page_content, 
+            "page_content": chunk.page_content,
+            "book_id": str(chunk.metadata.get("book_id")),
+            "section_id": int(chunk.metadata.get("section_id", 0)),
+            "active_characters": list(chunk.metadata.get("active_characters", [])),
+            "chunk_summary": str(chunk.metadata.get("chunk_summary", "")),
+            "source": str(chunk.metadata.get("source", ""))
+        }
         
         vector_id = f"chunk_{start_id + idx}"
         vectors_to_upsert.append({
@@ -133,16 +151,18 @@ def load_and_chunk_book(file_path: str, chunk_size: int = 3000, chunk_overlap: i
     enriched_chunks = []
     book_title = os.path.basename(file_path).split(".")[0].lower().replace(" ", "_")
 
-    for idx, chunk in enumerate(chunks[:5]):  # Processing first 5 chunks for test run
+    # Process chunks (un-restricted for full books, or slice if testing)
+    for idx, chunk in enumerate(chunks[:20]):  
         meta = extract_chunk_metadata(chunk.page_content, book_title, idx)
         chunk.metadata.update({
             "book_id": book_title,
-            "section_id": meta.get("section_id", idx),
+            "section_id": meta.get("section_id", (idx // 3) + 1),
             "active_characters": meta.get("active_characters", []),
             "chunk_summary": meta.get("summary", "")
         })
         enriched_chunks.append(chunk)
         print(f"Processed Chunk {idx}: Book [{book_title}] | Section {chunk.metadata['section_id']} | Characters: {chunk.metadata['active_characters']}")
+        time.sleep(1)  # Gentle pause to respect rate limits
 
     # Push enriched chunks into Pinecone
     push_chunks_to_pinecone(enriched_chunks)
