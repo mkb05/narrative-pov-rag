@@ -60,7 +60,7 @@ def extract_chunk_metadata(chunk_text: str, book_title: str, chunk_index: int):
 
     try:
         response = groq_client.chat.completions.create(
-            model="groq/compound-mini",  # Updated to active free tier model
+            model="qwen/qwen3.6-27b",  # Updated to active free tier model
             messages=[{"role": "user", "content": prompt}],
             response_format={"type": "json_object"}
         )
