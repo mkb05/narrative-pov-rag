@@ -1,16 +1,40 @@
 import json
+import os
+from typing import Optional
 
-from fastapi import FastAPI, HTTPException
+from fastapi import BackgroundTasks, FastAPI, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
+from pinecone import Pinecone
 from pydantic import BaseModel
+from upstash_redis import Redis
 from backend.rag.engine import (
     retrieve_and_generate_pov,
     get_section_characters,
     get_original_section_text,
     query_narrative_graph
 )
+from backend.ingestion.bulk_ingest import run_multi_category_bulk_ingestion
+
 
 app = FastAPI(title="Character POV & GraphRAG API", version="1.0")
+
+# Initialize DB connections for admin operations
+try:
+    redis_admin = Redis(
+        url=os.getenv("UPSTASH_REDIS_REST_URL"),
+        token=os.getenv("UPSTASH_REDIS_REST_TOKEN")
+    )
+    redis_admin.ping()
+except Exception:
+    redis_admin = None
+
+try:
+    pc_admin = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
+    pinecone_index_admin = pc_admin.Index(os.getenv("PINECONE_INDEX_NAME", "literary-pov-master"))
+except Exception:
+    pinecone_index_admin = None
+
+ADMIN_SECRET_KEY = os.getenv("ADMIN_SECRET_KEY")
 
 app.add_middleware(
     CORSMiddleware,
@@ -34,6 +58,96 @@ class GraphSearchRequest(BaseModel):
 @app.get("/")
 def root():
     return {"message": "Character POV & GraphRAG API is running!"}
+
+
+
+class AdminIngestRequest(BaseModel):
+    books_per_category: int = 5
+    page: int = 1
+
+
+class AdminClearStorageRequest(BaseModel):
+    clear_redis: bool = False
+    clear_pinecone: bool = False
+    
+
+@app.post("/api/admin/bulk-ingest")
+async def trigger_admin_bulk_ingest(
+    request: AdminIngestRequest,
+    background_tasks: BackgroundTasks,
+    x_admin_secret: Optional[str] = Header(None)
+):
+    """Protected admin endpoint to trigger bulk ingestion in the background."""
+    if x_admin_secret != ADMIN_SECRET_KEY:
+        raise HTTPException(status_code=401, detail="Unauthorized: Invalid Admin Secret Key.")
+    
+    # Run bulk ingestion in the background so API responds instantly
+    background_tasks.add_task(
+        run_multi_category_bulk_ingestion,
+        books_per_category=request.books_per_category,
+        start_page=request.page,
+        total_pages=1
+    )
+    
+    return {
+        "status": "success",
+        "message": f"Bulk ingestion started in background for page {request.page} ({request.books_per_category} books/category)."
+    }
+
+
+
+@app.post("/api/admin/clear-storage")
+def clear_storage_endpoint(
+    request: AdminClearStorageRequest,
+    x_admin_secret: Optional[str] = Header(None)
+):
+    """Protected endpoint to clear Upstash Redis cache and/or Pinecone vectors."""
+    if x_admin_secret != ADMIN_SECRET_KEY:
+        raise HTTPException(status_code=401, detail="Unauthorized: Invalid Admin Secret Key.")
+
+    results = []
+
+    # 1. Clear Redis Cache (raw text, dynamic chars, rolling summaries, cached POVs)
+    if request.clear_redis:
+        if not redis_admin:
+            results.append("Redis client unavailable.")
+        else:
+            try:
+                patterns = ["rawtext:*", "chars:*", "summary:*", "pov:*"]
+                keys_to_delete = []
+                for p in patterns:
+                    matched = redis_admin.keys(p)
+                    if matched:
+                        keys_to_delete.extend(matched)
+
+                unique_keys = list(set(keys_to_delete))
+                for k in unique_keys:
+                    redis_admin.delete(k)
+
+                results.append(f"Cleared {len(unique_keys)} keys from Upstash Redis.")
+            except Exception as e:
+                results.append(f"Redis clear error: {str(e)}")
+
+    # 2. Clear Pinecone Index Vectors
+    if request.clear_pinecone:
+        if not pinecone_index_admin:
+            results.append("Pinecone index unavailable.")
+        else:
+            try:
+                pinecone_index_admin.delete(delete_all=True)
+                results.append("Deleted all vector embeddings from Pinecone index.")
+            except Exception as e:
+                results.append(f"Pinecone clear error: {str(e)}")
+
+    if not request.clear_redis and not request.clear_pinecone:
+        return {"status": "noop", "message": "No storage targets were selected."}
+
+    return {
+        "status": "success",
+        "message": " | ".join(results)
+    }
+
+
 
 @app.post("/api/graph-search")
 def graph_search_endpoint(request: GraphSearchRequest):
