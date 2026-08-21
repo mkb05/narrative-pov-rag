@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import Link from "next/link";
+import { useState, useEffect, useCallback } from "react";
 import ReactMarkdown from "react-markdown";
 
 // 20 robust fallback books to show instantly while the API fetches the full Redis catalog
@@ -183,26 +184,28 @@ export default function NewspaperHome() {
   const BACKEND_URL =
     process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
-  // Fetch Full Catalog from Backend API (Redis)
-  useEffect(() => {
-    const fetchCatalog = async () => {
-      try {
-        const res = await fetch(`${BACKEND_URL}/api/catalog`);
-        const data = await res.json();
-        if (res.ok && Array.isArray(data.books) && data.books.length > 0) {
-          setBooks(data.books);
-        }
-      } catch (err) {
-        console.error(
-          "Failed to load full catalog from API. Using fallback.",
-          err,
-        );
-      } finally {
-        setLoadingCatalog(false);
+  // Function to load the latest catalog from Redis
+  const fetchCatalog = useCallback(async () => {
+    setLoadingCatalog(true);
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/catalog`);
+      const data = await res.json();
+      if (res.ok && Array.isArray(data.books)) {
+        setBooks(data.books);
       }
-    };
-    fetchCatalog();
+    } catch (err) {
+      console.error("Failed to load catalog from backend:", err);
+    } finally {
+      setLoadingCatalog(false);
+    }
   }, [BACKEND_URL]);
+
+  // Fetch when page mounts or when returning from workspace
+  useEffect(() => {
+    if (!inWorkspace) {
+      fetchCatalog();
+    }
+  }, [inWorkspace, fetchCatalog]);
 
   // Dynamically extract unique categories from loaded books
   const categories = [
@@ -681,6 +684,16 @@ export default function NewspaperHome() {
           )}
         </div>
       )}
+
+      <footer className="mt-12 pt-6 border-t border-stone-300 text-center text-xs font-sans text-stone-500 flex justify-between items-center max-w-6xl mx-auto">
+        <span>The Chronicle of Perspectives © 2026</span>
+        <Link
+          href="/admin"
+          className="text-stone-400 hover:text-stone-700 transition"
+        >
+          ⚙️ Admin Console
+        </Link>
+      </footer>
     </main>
   );
 }
