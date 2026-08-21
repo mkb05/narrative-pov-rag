@@ -334,7 +334,7 @@ export default function NewspaperHome() {
   };
 
   return (
-    <main className="min-h-screen bg-[#f4f1ea] text-[#2c2c2c] font-serif p-4 md:p-8 select-none">
+    <main className="min-h-screen bg-[#f4f1ea] text-[#2c2c2c] font-serif p-4 md:p-8">
       <header className="border-b-4 border-double border-[#2c2c2c] pb-4 mb-6 text-center">
         <h5 className="text-xs uppercase tracking-widest font-sans mb-1 text-stone-600">
           The Daily Literary Gazette — Special Edition
@@ -470,19 +470,32 @@ export default function NewspaperHome() {
           {/* MODE 1: ORIGINAL BOOK TEXT */}
           {readingMode === "original" && (
             <div className="space-y-4 max-w-4xl mx-auto">
-              <div className="flex justify-between items-center bg-stone-100 border border-stone-300 p-3">
+              <div className="flex justify-between items-center bg-stone-100 border border-stone-300 p-3  flex-wrap">
                 <div className="flex items-center gap-3">
                   <label className="text-xs font-sans font-bold uppercase">
                     Section / Chapter:
                   </label>
                   <input
                     type="number"
-                    value={sectionId}
-                    onChange={(e) =>
-                      setSectionId(Math.max(1, Number(e.target.value)))
-                    }
+                    value={sectionId || ""}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === "") {
+                        setSectionId(0 as any);
+                      } else {
+                        const num = parseInt(val, 10);
+                        if (!isNaN(num)) {
+                          setSectionId(Math.max(1, num));
+                        }
+                      }
+                    }}
+                    onBlur={() => {
+                      if (!sectionId || sectionId < 1) {
+                        setSectionId(1);
+                      }
+                    }}
                     min={1}
-                    className="w-16 border border-black p-1 bg-white font-serif text-sm text-center"
+                    className="w-16 border border-black p-1 bg-white font-serif text-sm text-center focus:outline-none select-text cursor-text"
                   />
                 </div>
                 <div className="flex gap-2 font-sans text-xs w-full sm:w-auto justify-end">
@@ -491,13 +504,13 @@ export default function NewspaperHome() {
                     onClick={() =>
                       setSectionId((prev) => Math.max(1, prev - 1))
                     }
-                    className="border border-black px-3 py-1 disabled:opacity-30 hover:bg-stone-200"
+                    className="flex-1 sm:flex-none border border-black px-4 py-2 disabled:opacity-30 hover:bg-stone-200 text-center font-bold uppercase"
                   >
                     &larr; Previous
                   </button>
                   <button
                     onClick={() => setSectionId((prev) => prev + 1)}
-                    className="flex-1 sm:flex-none border border-black px-3 py-1 hover:bg-stone-200"
+                    className="flex-1 sm:flex-none border border-black px-4 py-2 hover:bg-stone-200 text-center font-bold uppercase"
                   >
                     Next &rarr;
                   </button>
@@ -541,12 +554,25 @@ export default function NewspaperHome() {
                   </label>
                   <input
                     type="number"
-                    value={sectionId}
-                    onChange={(e) =>
-                      setSectionId(Math.max(1, Number(e.target.value)))
-                    }
+                    value={sectionId || ""}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === "") {
+                        setSectionId(0 as any); // Allows the user to clear the input while typing
+                      } else {
+                        const num = parseInt(val, 10);
+                        if (!isNaN(num)) {
+                          setSectionId(Math.max(1, num));
+                        }
+                      }
+                    }}
+                    onBlur={() => {
+                      if (!sectionId || sectionId < 1) {
+                        setSectionId(1); // Resets to 1 if left empty
+                      }
+                    }}
                     min={1}
-                    className="w-full border border-black p-2 bg-stone-50 font-serif text-sm focus:outline-none"
+                    className="w-full border border-black p-2 bg-white font-serif text-sm focus:outline-none focus:ring-1 focus:ring-black select-text cursor-text"
                   />
                 </div>
 
