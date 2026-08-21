@@ -130,10 +130,28 @@ def check_and_lazy_ingest_book(book_id: str):
 
     text = text.strip()
 
-    # Split text into reliable sections (by chapters or chunk blocks)
-    # Using RecursiveCharacterTextSplitter to create clean uniform sections of ~4000 characters each
-    section_splitter = RecursiveCharacterTextSplitter(chunk_size=4000, chunk_overlap=0, separators=["CHAPTER", "\n\n\n", "\n\n"])
-    section_docs = section_splitter.split_documents([Document(page_content=text)])
+    # FIX: Use regex to find genuine chapter headers (e.g., "CHAPTER I", "Chapter 1", or standalone Roman/Arabic numbers on new lines)
+    # This pattern matches words like Chapter/CHAPTER followed by numbers, or standalone Roman/Arabic numerals with surrounding line breaks
+    chapter_pattern = r'\n\s*(?:CHAPTER|Chapter|SECTION|Section)?\s*(?:[IVXLCDM]+\b|\d+\b)\s*\n'
+    
+    # Split the raw text using the regex pattern
+    raw_sections = re.split(chapter_pattern, text)
+    
+    # Filter out empty or whitespace-only sections
+    cleaned_sections = [sec.strip() for sec in raw_sections if sec and len(sec.strip()) > 200]
+    
+    # If regex split successfully found multiple structural sections, wrap them as LangChain Documents
+    if len(cleaned_sections) > 1:
+        section_docs = [Document(page_content=sec) for sec in cleaned_sections]
+        print(f"[Lazy Ingestion] Successfully parsed {len(section_docs)} structural sections using chapter/numeric patterns.")
+    else:
+        # Fallback to RecursiveCharacterTextSplitter if headers weren't structured uniformly
+        section_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=4000, 
+            chunk_overlap=0, 
+            separators=["\n\n\n", "\n\n", "\n"]
+        )
+        section_docs = section_splitter.split_documents([Document(page_content=text)])
 
     if REDIS_AVAILABLE:
         for idx, sec_doc in enumerate(section_docs):
