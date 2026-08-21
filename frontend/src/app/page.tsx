@@ -470,7 +470,7 @@ export default function NewspaperHome() {
           {/* MODE 1: ORIGINAL BOOK TEXT */}
           {readingMode === "original" && (
             <div className="space-y-4 max-w-4xl mx-auto">
-              <div className="flex justify-between items-center bg-stone-100 border border-stone-300 p-3  flex-wrap">
+              <div className="flex justify-between items-center bg-stone-100 border border-stone-300 p-3 gap-4 flex-wrap">
                 <div className="flex items-center gap-3">
                   <label className="text-xs font-sans font-bold uppercase">
                     Section / Chapter:
