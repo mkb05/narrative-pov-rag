@@ -277,17 +277,17 @@ def get_section_characters(book_id: str, section_id: int) -> list[str]:
         
         if scene_text and scene_text != "Original text not available for this section.":
             try:
-                safe_scene_text = scene_text  # Keep it safely within token bounds
+                safe_scene_text = scene_text[:4000]  # Keep it safely within token bounds
                 extraction_prompt = (
                     f"List the names of all the characters present, speaking, or actively mentioned in this text excerpt from '{book_id}' (Section {section_id}). "
                     "Provide a simple comma-separated list of names (e.g., Elizabeth Bennet, Mr. Darcy, Jane). "
                     "Do not include extra text, explanations, or markdown."
                 )
                 response = groq_client.chat.completions.create(
-                    model="openai/gpt-oss-120b",
+                    model="groq/compound-mini",
                     messages=[
                         {"role": "system", "content": "You are a precise literary data extractor. Output only names separated by commas."},
-                        {"role": "user", "content": f"{extraction_prompt}\n\nText:\n{scene_text}"}
+                        {"role": "user", "content": f"{extraction_prompt}\n\nText:\n{safe_scene_text}"}
                     ],
                     temperature=0.1,
                     max_tokens=150
