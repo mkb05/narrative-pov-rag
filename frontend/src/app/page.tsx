@@ -147,8 +147,51 @@ const FALLBACK_BOOKS = [
   },
 ];
 
-// 🎨 Live Category Effects Background mapped to your exact categories
-// 🎨 UPDATED: Live Category Effects Background (Fixed for Light/Sepia Modes)
+// Uses color-burn with boosted contrast for Light/Sepia to create authentic recycled paper texture
+const FilmGrainOverlay = ({ theme }: { theme: string }) => {
+  const isDark = theme === "midnight";
+  return (
+    <div
+      className={`fixed inset-0 pointer-events-none z-[110] ${
+        isDark
+          ? "opacity-[0.12] mix-blend-screen"
+          : "opacity-[0.35] mix-blend-color-burn filter contrast-[1.2]"
+      }`}
+      style={{
+        backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")`,
+      }}
+    />
+  );
+};
+
+// 🕯️  Interactive Cursor Tracking (Hidden on Mobile)
+const InteractiveCandlelight = ({ theme }: { theme: string }) => {
+  const [mousePos, setMousePos] = useState({ x: -1000, y: -1000 });
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      setMousePos({ x: e.clientX, y: e.clientY });
+    };
+    window.addEventListener("mousemove", handleMouseMove);
+    return () => window.removeEventListener("mousemove", handleMouseMove);
+  }, []);
+
+  const isDark = theme === "midnight";
+
+  return (
+    <div
+      // Added "hidden md:block" so it does not render on touch screens
+      className="hidden md:block fixed inset-0 pointer-events-none z-[100] transition-opacity duration-100"
+      style={{
+        background: isDark
+          ? `radial-gradient(400px circle at ${mousePos.x}px ${mousePos.y}px, rgba(255, 255, 255, 0.1), transparent 100%)`
+          : `radial-gradient(500px circle at ${mousePos.x}px ${mousePos.y}px, transparent 0%, rgba(0, 0, 0, 0.15) 100%)`,
+      }}
+    />
+  );
+};
+
+// 🎨 FIXED: Live Category Effects Background with VISIBLE Drifting Dust
 const LiveBackground = ({
   category,
   theme,
@@ -159,10 +202,9 @@ const LiveBackground = ({
   const cat = (category || "all").toLowerCase();
   const isDark = theme === "midnight";
 
-  // 🩸 HORROR
-  if (cat === "horror") {
+  if (cat.includes("horror") || cat.includes("thriller")) {
     return (
-      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden bg-red-950/5">
+      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
         <div
           className={`absolute -top-32 -left-32 w-[40rem] h-[40rem] rounded-full blur-[100px] animate-pulse ${isDark ? "bg-red-800/30" : "bg-red-500/20"}`}
         />
@@ -172,12 +214,53 @@ const LiveBackground = ({
         <div
           className={`absolute -bottom-40 left-1/4 w-[50rem] h-[20rem] rounded-full blur-[100px] animate-pulse delay-1000 ${isDark ? "bg-stone-900/80" : "bg-stone-500/20"}`}
         />
+
+        {/* CSS Drifting Embers (Made Brighter & Larger) */}
+        <div
+          className={`dust-particle absolute bottom-0 left-1/3 w-4 h-4 rounded-full blur-[1px] ${isDark ? "bg-orange-500" : "bg-orange-600"}`}
+          style={{ animationDelay: "0s" }}
+        />
+        <div
+          className={`dust-particle absolute bottom-32 right-1/4 w-5 h-5 rounded-full blur-[2px] ${isDark ? "bg-red-500" : "bg-red-600"}`}
+          style={{ animationDelay: "2s" }}
+        />
+        <div
+          className={`dust-particle absolute bottom-20 right-1/3 w-3 h-3 rounded-full blur-[1px] ${isDark ? "bg-yellow-400" : "bg-yellow-600"}`}
+          style={{ animationDelay: "4s" }}
+        />
       </div>
     );
   }
 
-  // 💌 ROMANCE & DRAMA
-  if (cat === "romance" || cat === "drama") {
+  if (cat.includes("fantasy") || cat.includes("poetry")) {
+    return (
+      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
+        <div
+          className={`absolute -top-10 left-1/4 w-[30rem] h-[30rem] rounded-full blur-[100px] animate-pulse ${isDark ? "bg-purple-400/30" : "bg-purple-400/40"}`}
+        />
+        <div
+          className={`absolute bottom-10 right-1/4 w-[40rem] h-[40rem] rounded-full blur-[120px] animate-pulse delay-1000 ${isDark ? "bg-amber-300/20" : "bg-amber-400/40"}`}
+        />
+
+        {/* CSS Drifting Pixie Dust */}
+        <div
+          className={`dust-particle absolute bottom-0 left-10 w-4 h-4 rounded-full blur-[1px] ${isDark ? "bg-amber-300" : "bg-amber-500"}`}
+          style={{ animationDelay: "1s" }}
+        />
+        <div
+          className={`dust-particle absolute bottom-20 right-32 w-3 h-3 rounded-full blur-[1px] ${isDark ? "bg-purple-300" : "bg-purple-600"}`}
+          style={{ animationDelay: "3s" }}
+        />
+        <div
+          className={`dust-particle absolute bottom-10 left-1/3 w-5 h-5 rounded-full blur-[2px] ${isDark ? "bg-amber-200" : "bg-amber-600"}`}
+          style={{ animationDelay: "5s" }}
+        />
+      </div>
+    );
+  }
+
+  // General Catch-all Fallbacks for other categories...
+  if (cat.includes("romance") || cat.includes("drama")) {
     return (
       <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
         <div
@@ -193,8 +276,7 @@ const LiveBackground = ({
     );
   }
 
-  // 🔍 MYSTERY
-  if (cat === "mystery") {
+  if (cat.includes("mystery") || cat.includes("crime")) {
     return (
       <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
         <div
@@ -210,8 +292,7 @@ const LiveBackground = ({
     );
   }
 
-  // 🚀 SCIENCE FICTION
-  if (cat === "science fiction") {
+  if (cat.includes("science fiction") || cat.includes("sci-fi")) {
     return (
       <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
         <div
@@ -227,31 +308,7 @@ const LiveBackground = ({
     );
   }
 
-  // 🔮 FANTASY & POETRY
-  if (cat === "fantasy" || cat === "poetry") {
-    return (
-      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
-        <div
-          className={`absolute -top-10 left-1/4 w-[30rem] h-[30rem] rounded-full blur-[100px] animate-pulse ${isDark ? "bg-purple-400/30" : "bg-purple-400/40"}`}
-        />
-        <div
-          className={`absolute bottom-10 right-1/4 w-[40rem] h-[40rem] rounded-full blur-[120px] animate-pulse delay-1000 ${isDark ? "bg-amber-300/20" : "bg-amber-400/40"}`}
-        />
-        <div
-          className={`absolute top-1/4 left-10 w-4 h-4 rounded-full blur-[4px] animate-ping ${isDark ? "bg-amber-200/80" : "bg-amber-400/80"}`}
-        />
-        <div
-          className={`absolute top-1/3 right-32 w-3 h-3 rounded-full blur-[3px] animate-ping delay-300 ${isDark ? "bg-purple-200/80" : "bg-purple-400/80"}`}
-        />
-        <div
-          className={`absolute bottom-1/4 left-1/3 w-5 h-5 rounded-full blur-[5px] animate-ping delay-700 ${isDark ? "bg-amber-100/80" : "bg-amber-400/80"}`}
-        />
-      </div>
-    );
-  }
-
-  // 🗺️ ADVENTURE & HISTORY
-  if (cat === "adventure" || cat === "history") {
+  if (cat.includes("adventure") || cat.includes("history")) {
     return (
       <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
         <div
@@ -264,7 +321,6 @@ const LiveBackground = ({
     );
   }
 
-  // 📖 ALL / FICTION (Default Fallback)
   return (
     <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
       <div
@@ -285,13 +341,11 @@ export default function NewspaperHome() {
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [activeBook, setActiveBook] = useState<any | null>(null);
 
-  // Reading Theme & Typography Modes
   const [readingTheme, setReadingTheme] = useState<
     "newspaper" | "sepia" | "midnight"
   >("newspaper");
   const [fontSize, setFontSize] = useState<"sm" | "base" | "lg">("base");
 
-  // Workspace states
   const [inWorkspace, setInWorkspace] = useState(false);
   const [currentBookId, setCurrentBookId] = useState("frankenstein");
   const [currentBookTitle, setCurrentBookTitle] = useState("Frankenstein");
@@ -305,14 +359,12 @@ export default function NewspaperHome() {
   const [dynamicCharacters, setDynamicCharacters] = useState<string[]>([]);
   const [loadingCharacters, setLoadingCharacters] = useState(false);
 
-  // Content states
   const [originalText, setOriginalText] = useState("");
   const [loadingOriginal, setLoadingOriginal] = useState(false);
   const [responseContent, setResponseContent] = useState("");
   const [loadingPOV, setLoadingPOV] = useState(false);
   const [isCachedResult, setIsCachedResult] = useState(false);
 
-  // GraphRAG states
   const [graphInitialized, setGraphInitialized] = useState(false);
   const [sliderValue, setSliderValue] = useState(1);
   const [searchQuery, setSearchQuery] = useState("");
@@ -327,18 +379,14 @@ export default function NewspaperHome() {
     try {
       const res = await fetch(`${BACKEND_URL}/api/catalog`);
       const data = await res.json();
-      if (res.ok && Array.isArray(data.books)) {
-        setBooks(data.books);
-      }
+      if (res.ok && Array.isArray(data.books)) setBooks(data.books);
     } catch (err) {
       console.error("Failed to load catalog from backend:", err);
     }
   }, [BACKEND_URL]);
 
   useEffect(() => {
-    if (!inWorkspace) {
-      fetchCatalog();
-    }
+    if (!inWorkspace) fetchCatalog();
   }, [inWorkspace, fetchCatalog]);
 
   const categories = [
@@ -370,7 +418,6 @@ export default function NewspaperHome() {
           query: searchQuery,
         }),
       });
-
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || "Graph query failed");
       setSearchResult(data.result);
@@ -383,7 +430,6 @@ export default function NewspaperHome() {
 
   useEffect(() => {
     if (!inWorkspace) return;
-
     const fetchRawText = async () => {
       setLoadingOriginal(true);
       try {
@@ -391,22 +437,18 @@ export default function NewspaperHome() {
           `${BACKEND_URL}/api/section-text?book_id=${currentBookId}&section_id=${sectionId}`,
         );
         const data = await res.json();
-        if (res.ok && data.original_text) {
-          setOriginalText(data.original_text);
-        }
+        if (res.ok && data.original_text) setOriginalText(data.original_text);
       } catch (err) {
-        console.error("Failed to load original section text:", err);
+        console.error("Failed to load section text:", err);
       } finally {
         setLoadingOriginal(false);
       }
     };
-
     fetchRawText();
   }, [inWorkspace, currentBookId, sectionId, BACKEND_URL]);
 
   useEffect(() => {
     if (!inWorkspace || readingMode !== "pov") return;
-
     const fetchCharacters = async () => {
       setLoadingCharacters(true);
       try {
@@ -414,16 +456,14 @@ export default function NewspaperHome() {
           `${BACKEND_URL}/api/characters?book_id=${currentBookId}&section_id=${sectionId}`,
         );
         const data = await res.json();
-        if (res.ok && Array.isArray(data.characters)) {
+        if (res.ok && Array.isArray(data.characters))
           setDynamicCharacters(data.characters);
-        }
       } catch (err) {
-        console.error("Failed to load section characters:", err);
+        console.error("Failed to load characters:", err);
       } finally {
         setLoadingCharacters(false);
       }
     };
-
     fetchCharacters();
   }, [inWorkspace, readingMode, currentBookId, sectionId, BACKEND_URL]);
 
@@ -457,7 +497,6 @@ export default function NewspaperHome() {
           target_character: targetCharacter,
         }),
       });
-
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || "Failed to generate POV");
       setResponseContent(data.content);
@@ -469,13 +508,12 @@ export default function NewspaperHome() {
     }
   };
 
-  // Pure, explicit color palettes without dark: conflicts
   const themeClasses = {
     newspaper: {
       bg: "bg-[#f8f6f0] text-stone-800",
       header:
-        "bg-white/80 backdrop-blur-sm border-stone-300 text-stone-900 shadow-sm",
-      workspace: "bg-white/80 backdrop-blur-sm border-stone-300 text-stone-900",
+        "bg-white/80 backdrop-blur-md border-stone-300 text-stone-900 shadow-sm",
+      workspace: "bg-white/90 backdrop-blur-md border-stone-300 text-stone-900",
       readingBox: "bg-[#fffdfa] border-stone-300 text-stone-900",
       subcard: "bg-stone-50 border-stone-200 text-stone-800",
       controlBar: "bg-[#f0f4f8] border-sky-200 text-sky-950",
@@ -486,19 +524,19 @@ export default function NewspaperHome() {
       btnPrimary: "bg-sky-700 hover:bg-sky-600 text-white",
       accentBadge: "bg-amber-100 text-amber-900 border-amber-300",
       pillBg:
-        "bg-white/80 backdrop-blur-sm text-stone-700 border-stone-200 hover:bg-stone-50",
+        "bg-white/80 backdrop-blur-md text-stone-700 border-stone-200 hover:bg-white",
       pillActive: "bg-stone-900 text-white shadow-md",
       cardBg:
-        "bg-white/80 backdrop-blur-sm border-stone-200 hover:border-stone-400 hover:shadow-lg",
+        "bg-white/90 backdrop-blur-md border-stone-200 hover:border-stone-400 hover:shadow-lg",
       activeModeBtn: "bg-stone-900 text-white shadow-xs",
       inactiveModeBtn: "text-stone-700 hover:bg-stone-200/70",
     },
     sepia: {
       bg: "bg-[#f4ecd8] text-[#433422]",
       header:
-        "bg-[#faeed9]/80 backdrop-blur-sm border-[#dfcfb4] text-[#362716] shadow-sm",
+        "bg-[#faeed9]/80 backdrop-blur-md border-[#dfcfb4] text-[#362716] shadow-sm",
       workspace:
-        "bg-[#faf0dc]/80 backdrop-blur-sm border-[#dfcfb4] text-[#362716]",
+        "bg-[#faf0dc]/90 backdrop-blur-md border-[#dfcfb4] text-[#362716]",
       readingBox: "bg-[#fdf6e7] border-[#dfcfb4] text-[#2c2014]",
       subcard: "bg-[#eedfc4]/60 border-[#dfcfb4] text-[#362716]",
       controlBar: "bg-[#ebdcc0] border-[#d8c5a4] text-[#362716]",
@@ -510,19 +548,19 @@ export default function NewspaperHome() {
       btnPrimary: "bg-[#8c5222] hover:bg-[#784419] text-[#fbf8f1]",
       accentBadge: "bg-[#eedfc4] text-[#5c3a1e] border-[#c8b79b]",
       pillBg:
-        "bg-[#faeed9]/80 backdrop-blur-sm text-[#433422] border-[#dfcfb4] hover:bg-[#ebdcc0]",
+        "bg-[#faeed9]/80 backdrop-blur-md text-[#433422] border-[#dfcfb4] hover:bg-[#ebdcc0]",
       pillActive: "bg-[#5c4033] text-[#fbf8f1] shadow-md",
       cardBg:
-        "bg-[#faeed9]/80 backdrop-blur-sm border-[#dfcfb4] hover:border-[#bfa987] hover:shadow-lg",
+        "bg-[#faeed9]/90 backdrop-blur-md border-[#dfcfb4] hover:border-[#bfa987] hover:shadow-lg",
       activeModeBtn: "bg-[#5c4033] text-[#fbf8f1] shadow-xs",
       inactiveModeBtn: "text-[#433422] hover:bg-[#ebdcc0]",
     },
     midnight: {
       bg: "bg-[#0b0f19] text-[#e2e8f0]",
       header:
-        "bg-[#111827]/80 backdrop-blur-sm border-slate-800 text-slate-100 shadow-sm",
+        "bg-[#111827]/80 backdrop-blur-md border-slate-800 text-slate-100 shadow-sm",
       workspace:
-        "bg-[#131c2e]/80 backdrop-blur-sm border-slate-700 text-slate-100",
+        "bg-[#131c2e]/90 backdrop-blur-md border-slate-700 text-slate-100",
       readingBox: "bg-[#0f172a] border-slate-700 text-slate-200",
       subcard: "bg-[#1e293b] border-slate-700 text-slate-200",
       controlBar: "bg-[#1e293b] border-slate-700 text-slate-100",
@@ -533,10 +571,10 @@ export default function NewspaperHome() {
       btnPrimary: "bg-indigo-600 hover:bg-indigo-500 text-white",
       accentBadge: "bg-indigo-950 text-indigo-300 border-indigo-800",
       pillBg:
-        "bg-slate-800/80 backdrop-blur-sm text-slate-300 border-slate-700 hover:bg-slate-700",
+        "bg-slate-800/80 backdrop-blur-md text-slate-300 border-slate-700 hover:bg-slate-700",
       pillActive: "bg-indigo-600 text-white shadow-md",
       cardBg:
-        "bg-slate-900/80 backdrop-blur-sm border-slate-800 hover:border-slate-700 hover:shadow-lg",
+        "bg-slate-900/90 backdrop-blur-md border-slate-800 hover:border-slate-700 hover:shadow-lg",
       activeModeBtn: "bg-indigo-600 text-white shadow-xs",
       inactiveModeBtn: "text-slate-300 hover:bg-slate-700",
     },
@@ -552,99 +590,92 @@ export default function NewspaperHome() {
     <main
       className={`min-h-screen relative transition-colors duration-500 font-serif ${themeClasses.bg}`}
     >
-      {/* 🔮 Live Animated Category Effects Overlay */}
+      {/* 🚀 INJECT STRICT CSS ANIMATIONS FOR DRIFTING DUST */}
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
+        @keyframes driftUp {
+          0% { transform: translateY(100px) scale(0.5); opacity: 0; }
+          20% { opacity: 0.8; }
+          80% { opacity: 0.8; }
+          100% { transform: translateY(-800px) scale(1.5); opacity: 0; }
+        }
+        .dust-particle {
+          animation: driftUp 10s infinite linear;
+        }
+      `,
+        }}
+      />
+
+      {/* 🎞️ CINEMATIC OVERLAY */}
+      <FilmGrainOverlay theme={readingTheme} />
+
+      {/* 🕯️ INTERACTIVE CURSOR */}
+      <InteractiveCandlelight theme={readingTheme} />
+
+      {/* 🔮 LIVE AMBIENT BACKGROUND */}
       <LiveBackground
         category={inWorkspace ? currentBookCategory : selectedCategory}
         theme={readingTheme}
       />
 
+      {/* 🚀 Wrapper ensuring content floats above the background effects */}
       <div className="relative z-10 p-4 md:p-8">
         {/* Header Container */}
+        {/* 📱 FIXED: Responsive Header Container */}
         <header
-          className={`max-w-7xl mx-auto border rounded-3xl p-6 mb-8 text-center transition-all ${themeClasses.header}`}
+          className={`max-w-7xl mx-auto border rounded-3xl p-4 md:p-6 mb-8 text-center transition-all ${themeClasses.header}`}
         >
-          <div className="flex justify-between items-center mb-3">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 font-sans text-xs uppercase tracking-widest font-bold">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
-              Special Edition Broadside
+          {/* Top Row: Stacks vertically on mobile, row on desktop */}
+          <div className="flex flex-col md:flex-row justify-between items-center mb-4 gap-4">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-100 text-emerald-800 font-sans text-xs uppercase tracking-widest font-bold">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping flex-shrink-0" />
+              <span>Special Edition Broadside</span>
             </div>
 
-            {/* Eye-Care Theme & Typography Controls */}
-            <div className="flex items-center gap-2 font-sans">
-              {/* Theme Selector (Always Visible) */}
+            <div className="flex flex-wrap justify-center items-center gap-2 font-sans relative z-50">
               <div
-                className={`flex p-1 rounded-full border text-xs gap-1 ${themeClasses.navBg}`}
+                className={`flex flex-wrap justify-center p-1 rounded-full border text-xs gap-1 ${themeClasses.navBg}`}
               >
                 <button
                   onClick={() => setReadingTheme("newspaper")}
-                  title="Light Paper"
-                  className={`px-3 py-1 rounded-full font-bold transition ${
-                    readingTheme === "newspaper"
-                      ? "bg-white text-stone-900 shadow-xs"
-                      : "opacity-70 hover:opacity-100"
-                  }`}
+                  className={`px-3 py-1 rounded-full font-bold transition ${readingTheme === "newspaper" ? "bg-white text-stone-900 shadow-xs" : "opacity-70 hover:opacity-100 cursor-pointer"}`}
                 >
                   ☀️ Light
                 </button>
                 <button
                   onClick={() => setReadingTheme("sepia")}
-                  title="Warm Sepia"
-                  className={`px-3 py-1 rounded-full font-bold transition ${
-                    readingTheme === "sepia"
-                      ? "bg-[#5c4033] text-[#fbf8f1] shadow-xs"
-                      : "opacity-70 hover:opacity-100"
-                  }`}
+                  className={`px-3 py-1 rounded-full font-bold transition ${readingTheme === "sepia" ? "bg-[#5c4033] text-[#fbf8f1] shadow-xs" : "opacity-70 hover:opacity-100 cursor-pointer"}`}
                 >
                   📜 Sepia
                 </button>
                 <button
                   onClick={() => setReadingTheme("midnight")}
-                  title="Midnight Dark"
-                  className={`px-3 py-1 rounded-full font-bold transition ${
-                    readingTheme === "midnight"
-                      ? "bg-indigo-600 text-white shadow-xs"
-                      : "opacity-70 hover:opacity-100"
-                  }`}
+                  className={`px-3 py-1 rounded-full font-bold transition ${readingTheme === "midnight" ? "bg-indigo-600 text-white shadow-xs" : "opacity-70 hover:opacity-100 cursor-pointer"}`}
                 >
                   🌙 Dark
                 </button>
               </div>
 
-              {/* Font Sizer: Rendered ONLY when inside the reading room / workspace */}
               {inWorkspace && (
                 <div
                   className={`hidden sm:flex p-1 rounded-full border text-xs font-bold animate-in fade-in duration-300 ${themeClasses.navBg}`}
                 >
                   <button
                     onClick={() => setFontSize("sm")}
-                    title="Small Text"
-                    className={`px-2 py-0.5 rounded-full transition ${
-                      fontSize === "sm"
-                        ? "bg-white text-stone-900 shadow-xs"
-                        : "opacity-60 hover:opacity-100"
-                    }`}
+                    className={`px-2 py-0.5 rounded-full transition cursor-pointer ${fontSize === "sm" ? "bg-white text-stone-900 shadow-xs" : "opacity-60 hover:opacity-100"}`}
                   >
                     A-
                   </button>
                   <button
                     onClick={() => setFontSize("base")}
-                    title="Regular Text"
-                    className={`px-2 py-0.5 rounded-full transition ${
-                      fontSize === "base"
-                        ? "bg-white text-stone-900 shadow-xs"
-                        : "opacity-60 hover:opacity-100"
-                    }`}
+                    className={`px-2 py-0.5 rounded-full transition cursor-pointer ${fontSize === "base" ? "bg-white text-stone-900 shadow-xs" : "opacity-60 hover:opacity-100"}`}
                   >
                     A
                   </button>
                   <button
                     onClick={() => setFontSize("lg")}
-                    title="Large Text"
-                    className={`px-2 py-0.5 rounded-full transition ${
-                      fontSize === "lg"
-                        ? "bg-white text-stone-900 shadow-xs"
-                        : "opacity-60 hover:opacity-100"
-                    }`}
+                    className={`px-2 py-0.5 rounded-full transition cursor-pointer ${fontSize === "lg" ? "bg-white text-stone-900 shadow-xs" : "opacity-60 hover:opacity-100"}`}
                   >
                     A+
                   </button>
@@ -653,13 +684,16 @@ export default function NewspaperHome() {
             </div>
           </div>
 
-          <h1 className="text-3xl md:text-5xl lg:text-6xl font-black tracking-tight uppercase font-serif my-2 drop-shadow-xs">
+          {/* Dynamic text sizing for mobile */}
+          <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-black tracking-tight uppercase font-serif my-3 md:my-2 drop-shadow-xs leading-tight">
             The Chronicle of Perspectives
           </h1>
-          <div className="flex flex-wrap justify-between items-center text-xs font-sans uppercase tracking-wider border-t border-stone-200/50 pt-3 mt-3 px-2 opacity-80 gap-2">
+
+          {/* Bottom Row: Wrapping items for narrow screens */}
+          <div className="flex flex-col md:flex-row flex-wrap justify-between items-center text-[10px] md:text-xs font-sans uppercase tracking-wider border-t border-stone-200/50 pt-3 md:pt-4 mt-3 px-2 opacity-80 gap-3 text-center">
             <span>Vol. CXXVI No. 42</span>
             <span
-              className={`px-3 py-0.5 rounded-full font-medium border ${themeClasses.accentBadge}`}
+              className={`px-3 py-1 rounded-full font-medium border ${themeClasses.accentBadge}`}
             >
               ✦ Zero-Token Redis Cache & Graph Engine ✦
             </span>
@@ -670,16 +704,14 @@ export default function NewspaperHome() {
         {!inWorkspace ? (
           <>
             {/* Category Filter Pills */}
-            <nav className="flex justify-center gap-2 mb-8 font-sans text-xs uppercase tracking-wider flex-wrap max-w-5xl mx-auto">
+            <nav className="flex justify-center gap-2 mb-8 font-sans text-xs uppercase tracking-wider flex-wrap max-w-5xl mx-auto relative z-50">
               {categories.map((cat) => {
                 const isActive = selectedCategory === cat;
                 return (
                   <button
                     key={cat}
                     onClick={() => setSelectedCategory(cat)}
-                    className={`px-4 py-2 rounded-full font-bold transition-all duration-300 border ${
-                      isActive ? themeClasses.pillActive : themeClasses.pillBg
-                    }`}
+                    className={`px-4 py-2 rounded-full font-bold transition-all duration-300 border cursor-pointer ${isActive ? themeClasses.pillActive : themeClasses.pillBg}`}
                   >
                     {cat}
                   </button>
@@ -688,7 +720,7 @@ export default function NewspaperHome() {
             </nav>
 
             {/* Book Catalog Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-7xl mx-auto">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-7xl mx-auto relative z-50">
               {filteredBooks.map((book) => (
                 <article
                   key={book.id}
@@ -723,13 +755,13 @@ export default function NewspaperHome() {
 
             {/* Book Modal */}
             {activeBook && (
-              <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
+              <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-[120] animate-in fade-in duration-200">
                 <div
                   className={`border p-8 max-w-lg w-full shadow-2xl relative rounded-3xl animate-in zoom-in-95 duration-200 ${themeClasses.workspace}`}
                 >
                   <button
                     onClick={() => setActiveBook(null)}
-                    className={`absolute top-5 right-5 font-sans font-bold text-sm w-8 h-8 rounded-full border flex items-center justify-center transition ${themeClasses.btnSecondary}`}
+                    className={`absolute top-5 right-5 font-sans font-bold text-sm w-8 h-8 rounded-full border flex items-center justify-center transition cursor-pointer ${themeClasses.btnSecondary}`}
                   >
                     ✕
                   </button>
@@ -750,7 +782,7 @@ export default function NewspaperHome() {
                   </div>
                   <button
                     onClick={() => handleEnterWorkspace(activeBook)}
-                    className={`w-full font-sans font-bold uppercase tracking-widest py-3.5 text-xs rounded-xl transition-all shadow-md hover:scale-[1.01] active:scale-[0.99] ${themeClasses.btnPrimary}`}
+                    className={`w-full font-sans font-bold uppercase tracking-widest py-3.5 text-xs rounded-xl transition-all shadow-md hover:scale-[1.01] active:scale-[0.99] cursor-pointer ${themeClasses.btnPrimary}`}
                   >
                     📖 Enter Reading Room & Read
                   </button>
@@ -761,43 +793,31 @@ export default function NewspaperHome() {
         ) : (
           /* Workspace Panel */
           <div
-            className={`max-w-7xl mx-auto border p-6 md:p-8 rounded-3xl shadow-xl transition-all ${themeClasses.workspace}`}
+            className={`max-w-7xl mx-auto border p-6 md:p-8 rounded-3xl shadow-xl transition-all relative z-50 ${themeClasses.workspace}`}
           >
-            {/* Top Bar */}
             <div className="flex flex-wrap justify-between items-center border-b border-stone-200/50 pb-4 mb-6 gap-4">
               <button
                 onClick={() => setInWorkspace(false)}
-                className={`font-sans text-xs uppercase tracking-wider font-bold border px-4 py-2 rounded-xl transition shadow-2xs hover:scale-[1.02] ${themeClasses.btnSecondary}`}
+                className={`font-sans text-xs uppercase tracking-wider font-bold border px-4 py-2 rounded-xl transition shadow-2xs hover:scale-[1.02] cursor-pointer ${themeClasses.btnSecondary}`}
               >
                 &larr; Back to Catalog
               </button>
-
-              {/* Reading Mode Switcher */}
               <div
                 className={`flex p-1 rounded-2xl border font-sans text-xs font-bold uppercase gap-1 shadow-inner ${themeClasses.navBg}`}
               >
                 <button
                   onClick={() => setReadingMode("original")}
-                  className={`px-4 py-2 rounded-xl transition-all ${
-                    readingMode === "original"
-                      ? themeClasses.activeModeBtn
-                      : themeClasses.inactiveModeBtn
-                  }`}
+                  className={`px-4 py-2 rounded-xl transition-all cursor-pointer ${readingMode === "original" ? themeClasses.activeModeBtn : themeClasses.inactiveModeBtn}`}
                 >
                   📜 Original Book Text
                 </button>
                 <button
                   onClick={() => setReadingMode("pov")}
-                  className={`px-4 py-2 rounded-xl transition-all ${
-                    readingMode === "pov"
-                      ? themeClasses.activeModeBtn
-                      : themeClasses.inactiveModeBtn
-                  }`}
+                  className={`px-4 py-2 rounded-xl transition-all cursor-pointer ${readingMode === "pov" ? themeClasses.activeModeBtn : themeClasses.inactiveModeBtn}`}
                 >
                   🎭 Character POV & Insights
                 </button>
               </div>
-
               <span
                 className={`font-sans text-xs font-bold uppercase tracking-widest border px-3.5 py-1.5 rounded-xl ${themeClasses.accentBadge}`}
               >
@@ -805,7 +825,6 @@ export default function NewspaperHome() {
               </span>
             </div>
 
-            {/* MODE 1: ORIGINAL TEXT */}
             {readingMode === "original" && (
               <div className="space-y-6 max-w-4xl mx-auto">
                 <div
@@ -820,9 +839,8 @@ export default function NewspaperHome() {
                       value={sectionId || ""}
                       onChange={(e) => {
                         const val = e.target.value;
-                        if (val === "") {
-                          setSectionId(0 as any);
-                        } else {
+                        if (val === "") setSectionId(0 as any);
+                        else {
                           const num = parseInt(val, 10);
                           if (!isNaN(num)) setSectionId(Math.max(1, num));
                         }
@@ -840,13 +858,13 @@ export default function NewspaperHome() {
                       onClick={() =>
                         setSectionId((prev) => Math.max(1, prev - 1))
                       }
-                      className={`flex-1 sm:flex-none border px-4 py-2 rounded-xl disabled:opacity-40 font-bold uppercase shadow-2xs transition ${themeClasses.btnSecondary}`}
+                      className={`flex-1 sm:flex-none border px-4 py-2 rounded-xl disabled:opacity-40 font-bold uppercase shadow-2xs transition cursor-pointer ${themeClasses.btnSecondary}`}
                     >
                       &larr; Previous
                     </button>
                     <button
                       onClick={() => setSectionId((prev) => prev + 1)}
-                      className={`flex-1 sm:flex-none px-5 py-2 rounded-xl font-bold uppercase shadow-xs transition ${themeClasses.btnPrimary}`}
+                      className={`flex-1 sm:flex-none px-5 py-2 rounded-xl font-bold uppercase shadow-xs transition cursor-pointer ${themeClasses.btnPrimary}`}
                     >
                       Next &rarr;
                     </button>
@@ -883,10 +901,8 @@ export default function NewspaperHome() {
               </div>
             )}
 
-            {/* MODE 2: POV & GRAPHRAG */}
             {readingMode === "pov" && (
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Sidebar */}
                 <div className="lg:col-span-1 border-r border-stone-200/50 pr-0 lg:pr-6 space-y-5">
                   <div
                     className={`border p-3.5 rounded-2xl shadow-2xs ${themeClasses.subcard}`}
@@ -899,9 +915,8 @@ export default function NewspaperHome() {
                       value={sectionId || ""}
                       onChange={(e) => {
                         const val = e.target.value;
-                        if (val === "") {
-                          setSectionId(0 as any);
-                        } else {
+                        if (val === "") setSectionId(0 as any);
+                        else {
                           const num = parseInt(val, 10);
                           if (!isNaN(num)) setSectionId(Math.max(1, num));
                         }
@@ -914,7 +929,6 @@ export default function NewspaperHome() {
                     />
                   </div>
 
-                  {/* Perspective Selector */}
                   <div
                     className={`border p-4 rounded-2xl space-y-3.5 shadow-xs ${themeClasses.subcard}`}
                   >
@@ -945,7 +959,7 @@ export default function NewspaperHome() {
                     <button
                       onClick={handleGeneratePOV}
                       disabled={loadingPOV}
-                      className={`w-full font-sans text-xs font-bold uppercase tracking-widest py-3 rounded-xl disabled:opacity-50 transition shadow-xs hover:shadow-md active:scale-[0.99] ${themeClasses.btnPrimary}`}
+                      className={`w-full font-sans text-xs font-bold uppercase tracking-widest py-3 rounded-xl disabled:opacity-50 transition shadow-xs hover:shadow-md active:scale-[0.99] cursor-pointer ${themeClasses.btnPrimary}`}
                     >
                       {loadingPOV
                         ? "Synthesizing POV..."
@@ -953,7 +967,6 @@ export default function NewspaperHome() {
                     </button>
                   </div>
 
-                  {/* Graph Intelligence */}
                   <div
                     className={`border p-4 rounded-2xl space-y-3.5 shadow-xs ${themeClasses.subcard}`}
                   >
@@ -963,7 +976,7 @@ export default function NewspaperHome() {
                     {!graphInitialized ? (
                       <button
                         onClick={() => setGraphInitialized(true)}
-                        className={`w-full border font-sans text-[11px] font-bold uppercase tracking-widest py-3 rounded-xl transition shadow-2xs ${themeClasses.btnSecondary}`}
+                        className={`w-full border font-sans text-[11px] font-bold uppercase tracking-widest py-3 rounded-xl transition shadow-2xs cursor-pointer ${themeClasses.btnSecondary}`}
                       >
                         🕸️ Init Narrative Graph
                       </button>
@@ -1000,7 +1013,7 @@ export default function NewspaperHome() {
                           <button
                             onClick={handleGraphSearch}
                             disabled={loadingGraphSearch}
-                            className={`w-full text-[11px] py-2.5 rounded-xl font-sans font-bold uppercase disabled:opacity-50 transition shadow-xs ${themeClasses.btnPrimary}`}
+                            className={`w-full text-[11px] py-2.5 rounded-xl font-sans font-bold uppercase disabled:opacity-50 transition shadow-xs cursor-pointer ${themeClasses.btnPrimary}`}
                           >
                             {loadingGraphSearch
                               ? "Searching Graph..."
@@ -1021,7 +1034,6 @@ export default function NewspaperHome() {
                   </div>
                 </div>
 
-                {/* Main POV Reading Canvas */}
                 <div
                   className={`lg:col-span-2 flex flex-col border p-6 rounded-3xl shadow-xs ${themeClasses.readingBox}`}
                 >
@@ -1059,8 +1071,7 @@ export default function NewspaperHome() {
           </div>
         )}
 
-        {/* Footer */}
-        <footer className="mt-12 pt-6 border-t border-stone-200/50 text-center text-xs font-sans opacity-60 flex justify-between items-center max-w-6xl mx-auto">
+        <footer className="mt-12 pt-6 border-t border-stone-200/50 text-center text-xs font-sans opacity-60 flex justify-between items-center max-w-6xl mx-auto relative z-50">
           <span>The Chronicle of Perspectives © 2026</span>
           <Link
             href="/admin"
