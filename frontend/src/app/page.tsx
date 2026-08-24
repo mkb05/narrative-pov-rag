@@ -173,113 +173,97 @@ const LiveBackground = ({
   const cat = (category || "all").toLowerCase();
   const isDark = theme === "midnight";
 
-  // 🩸 1. HORROR (Fast Blood Storm & Rapid Lightning)
+  // 🩸 1. HORROR (Soft, Ambient Crimson Pulses)
   if (cat.includes("horror") || cat.includes("thriller")) {
     return (
       <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
         <div
-          className={`absolute -top-32 -left-32 w-[40rem] h-[40rem] rounded-full blur-[100px] ${isDark ? "bg-red-800/40" : "bg-red-500/25"}`}
+          className={`absolute -top-32 -left-32 w-[40rem] h-[40rem] rounded-full blur-[120px] ${isDark ? "bg-red-900/30" : "bg-red-400/15"}`}
         />
         <div
-          className={`fast-lightning absolute inset-0 ${isDark ? "bg-red-600" : "bg-rose-400"}`}
+          className={`fast-lightning absolute inset-0 ${isDark ? "bg-red-800" : "bg-rose-300"}`}
         />
         <div
-          className={`blood-streak absolute top-0 left-[10%] w-[2.5px] h-36 ${isDark ? "bg-red-500 shadow-[0_0_12px_#ef4444]" : "bg-red-600"}`}
+          className={`blood-streak absolute top-0 left-[12%] w-[1.5px] h-28 ${isDark ? "bg-red-400/50 shadow-[0_0_8px_#ef4444]" : "bg-red-500/40"}`}
           style={{ animationDelay: "0s" }}
         />
         <div
-          className={`blood-streak absolute top-0 left-[30%] w-[3px] h-44 ${isDark ? "bg-rose-500 shadow-[0_0_12px_#f43f5e]" : "bg-red-700"}`}
-          style={{ animationDelay: "0.3s" }}
+          className={`blood-streak absolute top-0 left-[45%] w-[2px] h-32 ${isDark ? "bg-rose-400/50 shadow-[0_0_8px_#f43f5e]" : "bg-red-500/40"}`}
+          style={{ animationDelay: "1.2s" }}
         />
         <div
-          className={`blood-streak absolute top-0 left-[60%] w-[2px] h-32 ${isDark ? "bg-red-400 shadow-[0_0_10px_#f87171]" : "bg-rose-600"}`}
+          className={`blood-streak absolute top-0 left-[80%] w-[1.5px] h-24 ${isDark ? "bg-red-400/50 shadow-[0_0_8px_#ef4444]" : "bg-rose-500/40"}`}
           style={{ animationDelay: "0.6s" }}
-        />
-        <div
-          className={`blood-streak absolute top-0 left-[85%] w-[3px] h-48 ${isDark ? "bg-red-500 shadow-[0_0_12px_#ef4444]" : "bg-red-700"}`}
-          style={{ animationDelay: "0.15s" }}
         />
       </div>
     );
   }
 
-  // 💌 2. ROMANCE (Fast Petal Flurry Storm)
+  // 💌 2. ROMANCE (Gentle Swaying Petal Streams)
   if (cat.includes("romance")) {
     return (
       <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
         <div
-          className={`absolute top-0 -left-10 w-96 h-96 rounded-full blur-[80px] ${isDark ? "bg-pink-900/30" : "bg-pink-300/40"}`}
+          className={`absolute top-0 -left-10 w-96 h-96 rounded-full blur-[90px] ${isDark ? "bg-pink-900/20" : "bg-pink-200/30"}`}
         />
         <div
-          className={`petal-stream absolute top-0 left-[12%] w-5 h-7 rounded-full ${isDark ? "bg-rose-400 shadow-[0_0_10px_#fb7185]" : "bg-rose-500"}`}
+          className={`petal-stream absolute top-0 left-[18%] w-4 h-6 rounded-full ${isDark ? "bg-rose-400/50 shadow-[0_0_8px_#fb7185]" : "bg-rose-400/50"}`}
           style={{ animationDelay: "0s" }}
         />
         <div
-          className={`petal-stream absolute top-0 left-[32%] w-6 h-8 rounded-full ${isDark ? "bg-pink-400 shadow-[0_0_12px_#f472b6]" : "bg-pink-600"}`}
-          style={{ animationDelay: "0.8s" }}
+          className={`petal-stream absolute top-0 left-[52%] w-5 h-7 rounded-full ${isDark ? "bg-pink-400/50 shadow-[0_0_8px_#f472b6]" : "bg-pink-400/50"}`}
+          style={{ animationDelay: "2.5s" }}
         />
         <div
-          className={`petal-stream absolute top-0 left-[55%] w-5 h-6 rounded-full ${isDark ? "bg-rose-300 shadow-[0_0_8px_#fda4af]" : "bg-rose-400"}`}
-          style={{ animationDelay: "1.6s" }}
-        />
-        <div
-          className={`petal-stream absolute top-0 left-[78%] w-6 h-8 rounded-full ${isDark ? "bg-pink-500 shadow-[0_0_12px_#ec4899]" : "bg-pink-600"}`}
-          style={{ animationDelay: "0.4s" }}
-        />
-        <div
-          className={`petal-stream absolute top-0 left-[92%] w-4 h-6 rounded-full ${isDark ? "bg-rose-400 shadow-[0_0_8px_#fb7185]" : "bg-rose-500"}`}
-          style={{ animationDelay: "2.1s" }}
+          className={`petal-stream absolute top-0 left-[82%] w-4 h-5 rounded-full ${isDark ? "bg-rose-300/50 shadow-[0_0_6px_#fda4af]" : "bg-rose-300/50"}`}
+          style={{ animationDelay: "4.8s" }}
         />
       </div>
     );
   }
 
-  // 🎭 3. DRAMA (Golden Stage Spotlight)
+  // 🎭 3. DRAMA (Soft Ambient Theater Spotlight)
   if (cat.includes("drama")) {
     return (
       <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
         <div
-          className="spotlight-anim absolute -top-40 left-1/2 -translate-x-1/2 w-[35rem] h-[120vh] origin-top opacity-30"
+          className="spotlight-anim absolute -top-40 left-1/2 -translate-x-1/2 w-[35rem] h-[120vh] origin-top opacity-20"
           style={{
             background: isDark
-              ? "conic-gradient(from 160deg at 50% 0%, transparent, #fbbf24 20deg, transparent 40deg)"
-              : "conic-gradient(from 160deg at 50% 0%, transparent, #d97706 20deg, transparent 40deg)",
+              ? "conic-gradient(from 160deg at 50% 0%, transparent, #fbbf24 18deg, transparent 36deg)"
+              : "conic-gradient(from 160deg at 50% 0%, transparent, #d97706 18deg, transparent 36deg)",
           }}
         />
       </div>
     );
   }
 
-  // 🔍 4. MYSTERY (Heavy Angled Rain)
+  // 🔍 4. MYSTERY (Calm Gentle Rainfall)
   if (cat.includes("mystery") || cat.includes("crime")) {
     return (
       <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
         <div
-          className={`rain-streak absolute top-0 left-[12%] w-[2px] h-28 ${isDark ? "bg-cyan-200/60 shadow-[0_0_6px_cyan]" : "bg-slate-700/50"}`}
-          style={{ animationDelay: "0.1s" }}
+          className={`rain-streak absolute top-0 left-[15%] w-[1.5px] h-24 ${isDark ? "bg-cyan-200/40 shadow-[0_0_4px_cyan]" : "bg-slate-600/35"}`}
+          style={{ animationDelay: "0.2s" }}
         />
         <div
-          className={`rain-streak absolute top-0 left-[35%] w-[2px] h-36 ${isDark ? "bg-cyan-200/60 shadow-[0_0_6px_cyan]" : "bg-slate-700/50"}`}
-          style={{ animationDelay: "0.6s" }}
+          className={`rain-streak absolute top-0 left-[48%] w-[1.5px] h-28 ${isDark ? "bg-cyan-200/40 shadow-[0_0_4px_cyan]" : "bg-slate-600/35"}`}
+          style={{ animationDelay: "1.4s" }}
         />
         <div
-          className={`rain-streak absolute top-0 left-[62%] w-[2px] h-24 ${isDark ? "bg-cyan-200/60 shadow-[0_0_6px_cyan]" : "bg-slate-700/50"}`}
-          style={{ animationDelay: "0.3s" }}
-        />
-        <div
-          className={`rain-streak absolute top-0 left-[85%] w-[2px] h-32 ${isDark ? "bg-cyan-200/60 shadow-[0_0_6px_cyan]" : "bg-slate-700/50"}`}
-          style={{ animationDelay: "0.9s" }}
+          className={`rain-streak absolute top-0 left-[82%] w-[1.5px] h-20 ${isDark ? "bg-cyan-200/40 shadow-[0_0_4px_cyan]" : "bg-slate-600/35"}`}
+          style={{ animationDelay: "0.8s" }}
         />
       </div>
     );
   }
 
-  // 🚀 5. SCIENCE FICTION (Perspective Grid & Fast Scanline)
+  // 🚀 5. SCIENCE FICTION (Subtle Perspective Grid & Scanline)
   if (cat.includes("science fiction") || cat.includes("sci-fi")) {
     return (
       <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
         <div
-          className="grid-anim absolute -bottom-20 left-0 right-0 h-96 opacity-40"
+          className="grid-anim absolute -bottom-20 left-0 right-0 h-96 opacity-25"
           style={{
             backgroundImage: `linear-gradient(to right, ${isDark ? "#06b6d4" : "#0284c7"} 1.5px, transparent 1.5px), linear-gradient(to bottom, ${isDark ? "#06b6d4" : "#0284c7"} 1.5px, transparent 1.5px)`,
             backgroundSize: "36px 36px",
@@ -287,24 +271,21 @@ const LiveBackground = ({
           }}
         />
         <div
-          className={`scifi-scan absolute left-0 right-0 h-1.5 ${isDark ? "bg-cyan-400 shadow-[0_0_15px_#22d3ee]" : "bg-sky-600 shadow-[0_0_10px_#0284c7]"}`}
+          className={`scifi-scan absolute left-0 right-0 h-1 ${isDark ? "bg-cyan-400/50 shadow-[0_0_8px_#22d3ee]" : "bg-sky-600/40 shadow-[0_0_6px_#0284c7]"}`}
         />
       </div>
     );
   }
 
-  // 🗺️ 6. ADVENTURE (Giant Surging Ocean Waves Reaching the Top)
+  // 🗺️ 6. ADVENTURE (Slow Rolling Ocean Swells)
   if (cat.includes("adventure")) {
     return (
       <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
-        {/* Ambient background glow */}
         <div
-          className={`absolute -top-32 right-0 w-[40rem] h-[30rem] rounded-full blur-[100px] ${isDark ? "bg-emerald-600/20" : "bg-emerald-400/30"}`}
+          className={`absolute -top-32 right-0 w-[40rem] h-[30rem] rounded-full blur-[100px] ${isDark ? "bg-emerald-700/15" : "bg-emerald-300/20"}`}
         />
-
-        {/* Primary High-Surge Wave (Reaches near the top of the viewport) */}
         <svg
-          className="wave-surge absolute bottom-0 left-0 w-[240%] h-[60vh] opacity-25"
+          className="wave-surge absolute bottom-0 left-0 w-[240%] h-[55vh] opacity-15"
           viewBox="0 0 1200 120"
           preserveAspectRatio="none"
         >
@@ -313,10 +294,8 @@ const LiveBackground = ({
             fill={isDark ? "#10b981" : "#059669"}
           />
         </svg>
-
-        {/* Secondary Offset Wave for layered fluid depth */}
         <svg
-          className="wave-surge-secondary absolute bottom-0 left-0 w-[240%] h-[50vh] opacity-20"
+          className="wave-surge-secondary absolute bottom-0 left-0 w-[240%] h-[45vh] opacity-10"
           viewBox="0 0 1200 120"
           preserveAspectRatio="none"
         >
@@ -329,18 +308,16 @@ const LiveBackground = ({
     );
   }
 
-  // 🔮 7. FANTASY (Rotating Arcane Sigil Circle & Magic Glyphs)
+  // 🔮 7. FANTASY (Slow Rotating Arcane Sigil Circle)
   if (cat.includes("fantasy")) {
     return (
       <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden flex items-center justify-center">
         <div
-          className={`absolute -top-10 left-1/4 w-[30rem] h-[30rem] rounded-full blur-[100px] ${isDark ? "bg-purple-900/40" : "bg-purple-300/40"}`}
+          className={`absolute -top-10 left-1/4 w-[30rem] h-[30rem] rounded-full blur-[110px] ${isDark ? "bg-purple-900/30" : "bg-purple-200/30"}`}
         />
-
-        {/* Outer Arcane Circle */}
         <div className="sigil-pulse absolute flex items-center justify-center">
           <svg
-            className="spin-slow w-[34rem] h-[34rem] opacity-35"
+            className="spin-slow w-[32rem] h-[32rem] opacity-20"
             viewBox="0 0 200 200"
           >
             <circle
@@ -349,7 +326,7 @@ const LiveBackground = ({
               r="90"
               fill="none"
               stroke={isDark ? "#c084fc" : "#9333ea"}
-              strokeWidth="1.5"
+              strokeWidth="1.2"
               strokeDasharray="8 4"
             />
             <circle
@@ -358,26 +335,24 @@ const LiveBackground = ({
               r="75"
               fill="none"
               stroke={isDark ? "#fbbf24" : "#d97706"}
-              strokeWidth="1"
+              strokeWidth="0.8"
               strokeDasharray="3 3"
             />
             <polygon
               points="100,25 165,138 35,138"
               fill="none"
               stroke={isDark ? "#c084fc" : "#9333ea"}
-              strokeWidth="1.2"
+              strokeWidth="1.0"
             />
             <polygon
               points="100,175 35,62 165,62"
               fill="none"
               stroke={isDark ? "#fbbf24" : "#d97706"}
-              strokeWidth="1.2"
+              strokeWidth="1.0"
             />
           </svg>
-
-          {/* Inner Counter-Rotating Hexagram */}
           <svg
-            className="spin-reverse absolute w-[22rem] h-[22rem] opacity-40"
+            className="spin-reverse absolute w-[20rem] h-[20rem] opacity-25"
             viewBox="0 0 200 200"
           >
             <circle
@@ -386,7 +361,7 @@ const LiveBackground = ({
               r="60"
               fill="none"
               stroke={isDark ? "#f472b6" : "#db2777"}
-              strokeWidth="1.5"
+              strokeWidth="1.2"
               strokeDasharray="12 6"
             />
             <circle
@@ -395,31 +370,7 @@ const LiveBackground = ({
               r="40"
               fill="none"
               stroke={isDark ? "#fbbf24" : "#b45309"}
-              strokeWidth="1"
-            />
-            <circle
-              cx="100"
-              cy="40"
-              r="4"
-              fill={isDark ? "#fbbf24" : "#b45309"}
-            />
-            <circle
-              cx="100"
-              cy="160"
-              r="4"
-              fill={isDark ? "#fbbf24" : "#b45309"}
-            />
-            <circle
-              cx="40"
-              cy="100"
-              r="4"
-              fill={isDark ? "#fbbf24" : "#b45309"}
-            />
-            <circle
-              cx="160"
-              cy="100"
-              r="4"
-              fill={isDark ? "#fbbf24" : "#b45309"}
+              strokeWidth="0.8"
             />
           </svg>
         </div>
@@ -427,15 +378,13 @@ const LiveBackground = ({
     );
   }
 
-  // 🖋️ 8. POETRY (Dynamic Flowing Calligraphy Ribbons Across Canvas)
+  // 🖋️ 8. POETRY (Slow Elegant Calligraphy Strokes)
   if (cat.includes("poetry")) {
     return (
       <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
         <div
-          className={`absolute top-1/4 right-1/4 w-80 h-80 rounded-full blur-[100px] ${isDark ? "bg-violet-900/30" : "bg-violet-300/30"}`}
+          className={`absolute top-1/4 right-1/4 w-80 h-80 rounded-full blur-[100px] ${isDark ? "bg-violet-900/20" : "bg-violet-200/20"}`}
         />
-
-        {/* Continuous Flowing Script Strokes */}
         <svg
           className="absolute inset-0 w-full h-full"
           viewBox="0 0 1200 800"
@@ -446,27 +395,27 @@ const LiveBackground = ({
             d="M-100,200 C300,50 400,450 700,250 C1000,50 1100,500 1400,300"
             fill="none"
             stroke={isDark ? "#c4b5fd" : "#7c3aed"}
-            strokeWidth="2.5"
+            strokeWidth="1.8"
           />
           <path
             className="calligraphy-draw"
             d="M-100,550 C200,750 500,350 800,600 C1100,850 1200,400 1400,650"
             fill="none"
             stroke={isDark ? "#fbcfe8" : "#db2777"}
-            strokeWidth="2"
-            style={{ animationDelay: "3s" }}
+            strokeWidth="1.5"
+            style={{ animationDelay: "6s" }}
           />
         </svg>
       </div>
     );
   }
 
-  // 📜 9. HISTORY (Rotating Antique Compass Rose)
+  // 📜 9. HISTORY (Slow Rotating Antique Compass Rose)
   if (cat.includes("history")) {
     return (
       <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden flex items-center justify-center">
         <svg
-          className="spin-slow w-[32rem] h-[32rem] opacity-20"
+          className="spin-slow w-[32rem] h-[32rem] opacity-15"
           viewBox="0 0 100 100"
         >
           <circle
@@ -497,45 +446,55 @@ const LiveBackground = ({
     );
   }
 
-  // 📘 10. FICTION (Fluttering Novel Pages & Manuscript Leaves)
+  // 📘 10. FICTION (Slowly Drifting Manuscript Leaves)
   if (cat === "fiction") {
     return (
       <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
         <div
-          className={`absolute -top-32 left-1/4 w-[40rem] h-[40rem] rounded-full blur-[100px] ${isDark ? "bg-sky-950/40" : "bg-sky-200/40"}`}
-        />
-
-        {/* Floating Geometric Manuscript Leaves */}
-        <div
-          className={`page-drift absolute bottom-0 left-[15%] w-8 h-12 rounded-[2px] border ${isDark ? "border-sky-400/60 bg-sky-900/30 shadow-[0_0_12px_#38bdf8]" : "border-sky-600/60 bg-white/70 shadow-sm"}`}
-          style={{ animationDelay: "0s" }}
+          className={`absolute -top-32 left-1/4 w-[40rem] h-[40rem] rounded-full blur-[100px] ${isDark ? "bg-sky-950/30" : "bg-sky-200/30"}`}
         />
         <div
-          className={`page-drift absolute bottom-0 left-[42%] w-10 h-14 rounded-[2px] border ${isDark ? "border-indigo-400/60 bg-indigo-900/30 shadow-[0_0_12px_#818cf8]" : "border-indigo-600/60 bg-white/70 shadow-sm"}`}
-          style={{ animationDelay: "2.5s" }}
+          className={`page-drift absolute bottom-[-10vh] left-[15%] w-8 h-12 rounded-[2px] border ${
+            isDark
+              ? "border-sky-400/40 bg-sky-900/20 shadow-[0_0_8px_#38bdf8]"
+              : "border-sky-600/40 bg-white/50"
+          }`}
+          style={{ animationDelay: "0s", animationDuration: "15s" }}
         />
         <div
-          className={`page-drift absolute bottom-0 left-[75%] w-7 h-10 rounded-[2px] border ${isDark ? "border-blue-400/60 bg-blue-900/30 shadow-[0_0_12px_#60a5fa]" : "border-blue-600/60 bg-white/70 shadow-sm"}`}
-          style={{ animationDelay: "4.8s" }}
+          className={`page-drift absolute bottom-[-10vh] left-[45%] w-9 h-14 rounded-[2px] border ${
+            isDark
+              ? "border-indigo-400/40 bg-indigo-900/20 shadow-[0_0_8px_#818cf8]"
+              : "border-indigo-600/40 bg-white/50"
+          }`}
+          style={{ animationDelay: "4s", animationDuration: "18s" }}
+        />
+        <div
+          className={`page-drift absolute bottom-[-10vh] left-[78%] w-7 h-11 rounded-[2px] border ${
+            isDark
+              ? "border-blue-400/40 bg-blue-900/20 shadow-[0_0_8px_#60a5fa]"
+              : "border-blue-600/40 bg-white/50"
+          }`}
+          style={{ animationDelay: "8s", animationDuration: "16s" }}
         />
       </div>
     );
   }
 
-  // 📖 11. ALL / DEFAULT (Omni Prismatic Expanding Shockwaves)
+  // 📖 11. ALL / DEFAULT (Slow Expanding Orbital Waves)
   return (
     <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden flex items-center justify-center">
       <div
-        className={`pulse-wave absolute w-96 h-96 rounded-full border-2 ${isDark ? "border-indigo-400 shadow-[0_0_25px_#818cf8]" : "border-sky-500 shadow-[0_0_20px_#0ea5e9]"}`}
+        className={`pulse-wave absolute w-96 h-96 rounded-full border ${isDark ? "border-indigo-400/40 shadow-[0_0_15px_#818cf8]" : "border-sky-500/30 shadow-[0_0_10px_#0ea5e9]"}`}
         style={{ animationDelay: "0s" }}
       />
       <div
-        className={`pulse-wave absolute w-96 h-96 rounded-full border-2 ${isDark ? "border-purple-400 shadow-[0_0_25px_#c084fc]" : "border-indigo-500 shadow-[0_0_20px_#6366f1]"}`}
-        style={{ animationDelay: "1.2s" }}
+        className={`pulse-wave absolute w-96 h-96 rounded-full border ${isDark ? "border-purple-400/40 shadow-[0_0_15px_#c084fc]" : "border-indigo-500/30 shadow-[0_0_10px_#6366f1]"}`}
+        style={{ animationDelay: "2.5s" }}
       />
       <div
-        className={`pulse-wave absolute w-96 h-96 rounded-full border-2 ${isDark ? "border-amber-400 shadow-[0_0_25px_#fde047]" : "border-emerald-500 shadow-[0_0_20px_#10b981]"}`}
-        style={{ animationDelay: "2.4s" }}
+        className={`pulse-wave absolute w-96 h-96 rounded-full border ${isDark ? "border-amber-400/40 shadow-[0_0_15px_#fde047]" : "border-emerald-500/30 shadow-[0_0_10px_#10b981]"}`}
+        style={{ animationDelay: "5s" }}
       />
     </div>
   );
@@ -799,16 +758,25 @@ export default function NewspaperHome() {
       <style
         dangerouslySetInnerHTML={{
           __html: `
+  /* 🌧️ Mystery: Gentle, slow rainfall */
   @keyframes rainFall {
     0% { transform: translateY(-120px) translateX(0); opacity: 0; }
-    20% { opacity: 0.8; }
-    80% { opacity: 0.8; }
-    100% { transform: translateY(100vh) translateX(-40px); opacity: 0; }
+    20% { opacity: 0.45; }
+    80% { opacity: 0.45; }
+    100% { transform: translateY(100vh) translateX(-20px); opacity: 0; }
   }
+
+  /* 🌐 Sci-Fi: Slow wireframe pulse & scan */
   @keyframes gridPulse {
-    0%, 100% { opacity: 0.25; transform: perspective(400px) rotateX(28deg) translateY(0); }
-    50% { opacity: 0.55; transform: perspective(400px) rotateX(28deg) translateY(25px); }
+    0%, 100% { opacity: 0.15; transform: perspective(400px) rotateX(28deg) translateY(0); }
+    50% { opacity: 0.3; transform: perspective(400px) rotateX(28deg) translateY(15px); }
   }
+  @keyframes scanline {
+    0% { transform: translateY(-100%); }
+    100% { transform: translateY(1000%); }
+  }
+
+  /* 🧭 History: Ultra-slow rotators */
   @keyframes slowSpin {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
@@ -817,97 +785,96 @@ export default function NewspaperHome() {
     0% { transform: rotate(360deg); }
     100% { transform: rotate(0deg); }
   }
+
+  /* 🎭 Drama: Subtle stage sweep */
   @keyframes spotlightSweep {
-    0%, 100% { transform: rotate(-25deg); opacity: 0.2; }
-    50% { transform: rotate(25deg); opacity: 0.45; }
+    0%, 100% { transform: rotate(-20deg); opacity: 0.12; }
+    50% { transform: rotate(20deg); opacity: 0.25; }
   }
-  @keyframes scanline {
-    0% { transform: translateY(-100%); }
-    100% { transform: translateY(1000%); }
-  }
+
+  /* 🌊 Adventure: Calmed ocean tidal swell */
   @keyframes tidalSurge {
     0% { transform: translateX(0) translateY(0) scaleY(1); }
-    35% { transform: translateX(-15%) translateY(-88vh) scaleY(2.2); }
-    65% { transform: translateX(-35%) translateY(-88vh) scaleY(2.2); }
-    100% { transform: translateX(-50%) translateY(0) scaleY(1); }
+    40% { transform: translateX(-15%) translateY(-75vh) scaleY(1.7); }
+    60% { transform: translateX(-25%) translateY(-75vh) scaleY(1.7); }
+    100% { transform: translateX(-40%) translateY(0) scaleY(1); }
   }
   @keyframes tidalSurgeSecondary {
     0% { transform: translateX(0) translateY(0) scaleY(1); }
-    40% { transform: translateX(-20%) translateY(-75vh) scaleY(2.0); }
-    70% { transform: translateX(-40%) translateY(-75vh) scaleY(2.0); }
-    100% { transform: translateX(-50%) translateY(0) scaleY(1); }
+    45% { transform: translateX(-15%) translateY(-65vh) scaleY(1.5); }
+    65% { transform: translateX(-25%) translateY(-65vh) scaleY(1.5); }
+    100% { transform: translateX(-40%) translateY(0) scaleY(1); }
   }
+
+  /* 🩸 Horror: Calmer, softer ambient pulses & rain */
   @keyframes rapidLightning {
-    0%, 82%, 86%, 90%, 94%, 100% { opacity: 0; }
-    84%, 88%, 92% { opacity: 0.55; }
+    0%, 94%, 98%, 100% { opacity: 0; }
+    95%, 97% { opacity: 0.25; }
   }
   @keyframes fastBloodRain {
-    0% { transform: translateY(-150px) translateX(0); opacity: 0; }
-    20% { opacity: 0.95; }
-    80% { opacity: 0.95; }
-    100% { transform: translateY(105vh) translateX(-60px); opacity: 0; }
+    0% { transform: translateY(-120px) translateX(0); opacity: 0; }
+    20% { opacity: 0.45; }
+    80% { opacity: 0.45; }
+    100% { transform: translateY(105vh) translateX(-25px); opacity: 0; }
   }
+
+  /* 💌 Romance: Gentle drifting petals */
   @keyframes fastPetalStream {
-    0% { transform: translateY(-100px) translateX(0) rotate(0deg); opacity: 0; }
-    20% { opacity: 0.9; }
-    80% { opacity: 0.9; }
-    100% { transform: translateY(105vh) translateX(120px) rotate(720deg); opacity: 0; }
+    0% { transform: translateY(-80px) translateX(0) rotate(0deg); opacity: 0; }
+    20% { opacity: 0.6; }
+    80% { opacity: 0.6; }
+    100% { transform: translateY(105vh) translateX(80px) rotate(360deg); opacity: 0; }
   }
+
+  /* 🌌 All / Fiction: Slow ambient shockwaves */
   @keyframes rapidPulseWave {
-    0% { transform: scale(0.35); opacity: 0.7; }
-    50% { opacity: 0.4; }
-    100% { transform: scale(2.2); opacity: 0; }
+    0% { transform: scale(0.4); opacity: 0.45; }
+    50% { opacity: 0.25; }
+    100% { transform: scale(2.0); opacity: 0; }
   }
+
+  /* 🔮 Fantasy: Subtle Sigil Breathing */
   @keyframes sigilBreathe {
-    0%, 100% { transform: scale(0.95); opacity: 0.25; }
-    50% { transform: scale(1.08); opacity: 0.55; }
+    0%, 100% { transform: scale(0.96); opacity: 0.18; }
+    50% { transform: scale(1.04); opacity: 0.35; }
   }
+
+  /* 🖋️ Poetry: Slow Calming Calligraphy Flow */
   @keyframes drawInkStroke {
-    0% { stroke-dashoffset: 1500; opacity: 0.2; transform: translateY(-15px); }
-    50% { opacity: 0.65; transform: translateY(15px); }
-    100% { stroke-dashoffset: 0; opacity: 0.2; transform: translateY(-15px); }
+    0% { stroke-dashoffset: 1500; opacity: 0.12; transform: translateY(-8px); }
+    50% { opacity: 0.35; transform: translateY(8px); }
+    100% { stroke-dashoffset: 0; opacity: 0.12; transform: translateY(-8px); }
   }
 
-  /* 📄 Fiction: Floating Book Leaf / Fluttering Manuscript Pages */
+  /* 📄 Fiction: Gentle Drifting Manuscript Pages */
   @keyframes pageFlutter {
-    0% {
-      transform: translateY(0) translateX(0) rotateX(0deg) rotateZ(0deg);
-      opacity: 0;
-    }
-    15% {
-      opacity: 0.85;
-    }
-    50% {
-      transform: translateY(-50vh) translateX(50px) rotateX(180deg) rotateZ(90deg);
-      opacity: 0.9;
-    }
-    85% {
-      opacity: 0.85;
-    }
-    100% {
-      transform: translateY(-110vh) translateX(-30px) rotateX(360deg) rotateZ(270deg);
-      opacity: 0;
-    }
+    0% { transform: translateY(0) translateX(0) rotateX(0deg) rotateZ(0deg); opacity: 0; }
+    20% { opacity: 0.55; }
+    80% { opacity: 0.55; }
+    100% { transform: translateY(-110vh) translateX(-20px) rotateX(240deg) rotateZ(160deg); opacity: 0; }
   }
 
-  .rain-streak { animation: rainFall 1.4s infinite linear; }
-  .grid-anim { animation: gridPulse 5s infinite ease-in-out; }
-  .spin-slow { animation: slowSpin 35s infinite linear; }
-  .spin-reverse { animation: reverseSpin 25s infinite linear; }
-  .spotlight-anim { animation: spotlightSweep 10s infinite ease-in-out; }
-  .scifi-scan { animation: scanline 6s infinite linear; }
-  .wave-surge { animation: tidalSurge 11s infinite ease-in-out; }
-  .wave-surge-secondary { animation: tidalSurgeSecondary 13s infinite ease-in-out; }
-  .fast-lightning { animation: rapidLightning 3.5s infinite ease-in-out; }
-  .blood-streak { animation: fastBloodRain 0.9s infinite linear; }
-  .petal-stream { animation: fastPetalStream 2.8s infinite linear; }
-  .pulse-wave { animation: rapidPulseWave 3s infinite ease-out; }
-  .sigil-pulse { animation: sigilBreathe 6s infinite ease-in-out; }
+  /* Relaxed Pacing Classes */
+  .rain-streak { animation: rainFall 3.2s infinite linear; }
+  .grid-anim { animation: gridPulse 9s infinite ease-in-out; }
+  .spin-slow { animation: slowSpin 50s infinite linear; }
+  .spin-reverse { animation: reverseSpin 40s infinite linear; }
+  .spotlight-anim { animation: spotlightSweep 18s infinite ease-in-out; }
+  .scifi-scan { animation: scanline 12s infinite linear; }
+
+  .wave-surge { animation: tidalSurge 20s infinite ease-in-out; }
+  .wave-surge-secondary { animation: tidalSurgeSecondary 24s infinite ease-in-out; }
+
+  .fast-lightning { animation: rapidLightning 9s infinite ease-in-out; }
+  .blood-streak { animation: fastBloodRain 2.8s infinite linear; }
+  .petal-stream { animation: fastPetalStream 7s infinite ease-in-out; }
+  .pulse-wave { animation: rapidPulseWave 6.5s infinite ease-out; }
+  .sigil-pulse { animation: sigilBreathe 10s infinite ease-in-out; }
   .calligraphy-draw { 
     stroke-dasharray: 1500; 
-    animation: drawInkStroke 8s infinite linear; 
+    animation: drawInkStroke 16s infinite linear; 
   }
-  .page-drift { animation: pageFlutter 8s infinite linear; }
+  .page-drift { animation: pageFlutter 16s infinite ease-in-out; }
 `,
         }}
       />
