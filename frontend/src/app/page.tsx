@@ -507,7 +507,7 @@ export default function NewspaperHome() {
 
   const [readingTheme, setReadingTheme] = useState<
     "newspaper" | "sepia" | "midnight"
-  >("midnight");
+  >("sepia");
   const [fontSize, setFontSize] = useState<"sm" | "base" | "lg">("base");
 
   const [inWorkspace, setInWorkspace] = useState(false);
